@@ -27,6 +27,10 @@ data class Transaction(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
     var id: Int = 0,
+    @ColumnInfo(name = "accountId", defaultValue = "0")
+    var accountId: Int = 0,
+    @ColumnInfo(name = "isTransfer", defaultValue = "0")
+    var isTransfer: Boolean = false,
 ) : Serializable {
     val createdAtDateFormat: String
         get() = DateFormat.getDateTimeInstance()

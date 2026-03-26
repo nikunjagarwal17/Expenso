@@ -11,8 +11,8 @@ class CreateCsvContract : ActivityResultContract<String, Uri?>() {
     override fun createIntent(context: Context, input: String): Intent {
         return Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/csv"
-            putExtra(Intent.EXTRA_TITLE, "$input.csv")
+            type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            putExtra(Intent.EXTRA_TITLE, "$input.xlsx")
         }
     }
 
@@ -28,11 +28,11 @@ class OpenCsvContract : ActivityResultContract<Uri, Unit>() {
 
     override fun createIntent(context: Context, input: Uri): Intent {
         val title = "Open with"
-        val csvPreviewIntent = Intent(Intent.ACTION_OPEN_DOCUMENT, input).apply {
+        val previewIntent = Intent(Intent.ACTION_OPEN_DOCUMENT, input).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
         }
-        return Intent.createChooser(csvPreviewIntent, title)
+        return Intent.createChooser(previewIntent, title)
     }
 
     override fun parseResult(resultCode: Int, intent: Intent?) {

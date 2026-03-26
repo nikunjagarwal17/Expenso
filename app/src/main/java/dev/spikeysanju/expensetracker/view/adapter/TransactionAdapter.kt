@@ -10,6 +10,8 @@ import dev.spikeysanju.expensetracker.R
 import dev.spikeysanju.expensetracker.databinding.ItemTransactionLayoutBinding
 import dev.spikeysanju.expensetracker.model.Transaction
 import indianRupee
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class TransactionAdapter : RecyclerView.Adapter<TransactionAdapter.TransactionVH>() {
 
@@ -28,6 +30,9 @@ class TransactionAdapter : RecyclerView.Adapter<TransactionAdapter.TransactionVH
 
     val differ = AsyncListDiffer(this, differCallback)
 
+    private val inputDateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    private val displayDateFormat = SimpleDateFormat("dd MMMM yyyy", Locale.getDefault())
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TransactionVH {
         val binding =
             ItemTransactionLayoutBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -37,6 +42,11 @@ class TransactionAdapter : RecyclerView.Adapter<TransactionAdapter.TransactionVH
     override fun getItemCount(): Int {
         return differ.currentList.size
     }
+    private var currencySymbol: String = "₹"
+    fun setCurrencySymbol(symbol: String) {
+        currencySymbol = symbol
+        notifyDataSetChanged()
+    }
 
     override fun onBindViewHolder(holder: TransactionVH, position: Int) {
 
@@ -44,7 +54,14 @@ class TransactionAdapter : RecyclerView.Adapter<TransactionAdapter.TransactionVH
         holder.binding.apply {
 
             transactionName.text = item.title
-            transactionCategory.text = item.tag
+
+            // Format date from "dd/MM/yyyy" to "12 March 2026" style
+            transactionDate.text = try {
+                val parsed = inputDateFormat.parse(item.date)
+                if (parsed != null) displayDateFormat.format(parsed) else item.date
+            } catch (e: Exception) {
+                item.date
+            }
 
             when (item.transactionType) {
                 "Income" -> {
@@ -55,7 +72,7 @@ class TransactionAdapter : RecyclerView.Adapter<TransactionAdapter.TransactionVH
                         )
                     )
 
-                    transactionAmount.text = "+ ".plus(indianRupee(item.amount))
+                    transactionAmount.text = "+ $currencySymbol${item.amount}"
                 }
                 "Expense" -> {
                     transactionAmount.setTextColor(
@@ -64,45 +81,11 @@ class TransactionAdapter : RecyclerView.Adapter<TransactionAdapter.TransactionVH
                             R.color.expense
                         )
                     )
-                    transactionAmount.text = "- ".plus(indianRupee(item.amount))
+                    transactionAmount.text = "- $currencySymbol${item.amount}"
                 }
             }
 
-            when (item.tag) {
-                "Housing" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_food)
-                }
-                "Transportation" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_transport)
-                }
-                "Food" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_food)
-                }
-                "Utilities" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_utilities)
-                }
-                "Insurance" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_insurance)
-                }
-                "Healthcare" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_medical)
-                }
-                "Saving & Debts" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_savings)
-                }
-                "Personal Spending" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_personal_spending)
-                }
-                "Entertainment" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_entertainment)
-                }
-                "Miscellaneous" -> {
-                    transactionIconView.setImageResource(R.drawable.ic_others)
-                }
-                else -> {
-                    transactionIconView.setImageResource(R.drawable.ic_others)
-                }
-            }
+            transactionIconView.setImageResource(R.drawable.ic_others)
 
             // on item click
             holder.itemView.setOnClickListener {

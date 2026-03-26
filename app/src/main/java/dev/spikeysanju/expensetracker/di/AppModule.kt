@@ -10,12 +10,17 @@ import dagger.hilt.components.SingletonComponent
 import dev.spikeysanju.expensetracker.data.local.AppDatabase
 import dev.spikeysanju.expensetracker.data.local.datastore.UIModeDataStore
 import dev.spikeysanju.expensetracker.data.local.datastore.UIModeImpl
+import dev.spikeysanju.expensetracker.data.local.datastore.CurrencyPreference
+import dev.spikeysanju.expensetracker.data.local.datastore.QuickTilesPreference
 import dev.spikeysanju.expensetracker.services.exportcsv.ExportCsvService
 import javax.inject.Singleton
 
 @InstallIn(SingletonComponent::class)
 @Module
 object AppModule {
+    @Singleton
+    @Provides
+    fun provideAppContext(@ApplicationContext context: Context): Context = context
 
     @Singleton
     @Provides
@@ -34,5 +39,17 @@ object AppModule {
     @Provides
     fun provideExportCSV(@ApplicationContext context: Context): ExportCsvService {
         return ExportCsvService(appContext = context)
+    }
+
+    @Singleton
+    @Provides
+    fun provideCurrencyPreference(@ApplicationContext context: Context): CurrencyPreference {
+        return CurrencyPreference(context)
+    }
+
+    @Singleton
+    @Provides
+    fun provideQuickTilesPreference(@ApplicationContext context: Context): QuickTilesPreference {
+        return QuickTilesPreference(context)
     }
 }

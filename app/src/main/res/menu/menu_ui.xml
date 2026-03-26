@@ -6,6 +6,13 @@
         android:iconTint="@color/black"
         android:title="@string/text_filter"
         app:actionViewClass="androidx.appcompat.widget.AppCompatSpinner"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/spinner_account"
+        android:iconTint="@color/black"
+        android:title="Account Filter"
+        app:actionViewClass="androidx.appcompat.widget.AppCompatSpinner"
         app:showAsAction="always" />
 
     <item
@@ -13,7 +20,7 @@
         android:checkable="true"
         android:icon="@drawable/ic_day"
         android:title="@string/text_ui_mode"
-        app:showAsAction="always" />
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/action_about"
@@ -26,5 +33,11 @@
         android:enabled="true"
         android:title="@string/text_export_csv"
         app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_settings"
+        android:title="@string/text_settings"
+        app:showAsAction="never"
+        android:actionLayout="@layout/menu_settings_action" />
 
 </menu>

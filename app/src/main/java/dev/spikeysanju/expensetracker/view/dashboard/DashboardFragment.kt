@@ -38,7 +38,7 @@ import dev.spikeysanju.expensetracker.view.adapter.TransactionAdapter
 import dev.spikeysanju.expensetracker.view.base.BaseFragment
 import dev.spikeysanju.expensetracker.view.main.viewmodel.TransactionViewModel
 import hide
-import indianRupee
+// ...existing code...
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import show
@@ -79,13 +79,26 @@ class DashboardFragment :
         initViews()
         observeFilter()
         observeTransaction()
+        observeAccounts()
         swipeToDelete()
+    }
+
+    private fun observeAccounts() {
+        lifecycleScope.launchWhenStarted {
+            viewModel.allAccounts.collect { accounts ->
+                if (accounts.isEmpty()) {
+                    binding.btnAddTransaction.hide()
+                } else {
+                    binding.btnAddTransaction.show()
+                }
+            }
+        }
     }
 
     private fun observeFilter() = with(binding) {
         lifecycleScope.launchWhenCreated {
-            viewModel.transactionFilter.collect { filter ->
-                when (filter) {
+            viewModel.typeFilter.collect { type ->
+                when (type) {
                     "Overall" -> {
                         totalBalanceView.totalBalanceTitle.text =
                             getString(R.string.text_total_balance)
@@ -105,7 +118,6 @@ class DashboardFragment :
                         totalIncomeExpenseView.hide()
                     }
                 }
-                viewModel.getAllTransaction(filter)
             }
         }
     }
@@ -115,6 +127,12 @@ class DashboardFragment :
         transactionRv.apply {
             adapter = transactionAdapter
             layoutManager = LinearLayoutManager(activity)
+        }
+        // Observe currency symbol and update adapter
+        lifecycleScope.launchWhenStarted {
+            viewModel.currencySymbol.collect { symbol ->
+                transactionAdapter.setCurrencySymbol(symbol)
+            }
         }
     }
 
@@ -137,14 +155,16 @@ class DashboardFragment :
                 val position = viewHolder.adapterPosition
                 val transaction = transactionAdapter.differ.currentList[position]
                 val transactionItem = Transaction(
-                    transaction.title,
-                    transaction.amount,
-                    transaction.transactionType,
-                    transaction.tag,
-                    transaction.date,
-                    transaction.note,
-                    transaction.createdAt,
-                    transaction.id
+                    title = transaction.title,
+                    amount = transaction.amount,
+                    transactionType = transaction.transactionType,
+                    tag = transaction.tag,
+                    date = transaction.date,
+                    note = transaction.note,
+                    createdAt = transaction.createdAt,
+                    id = transaction.id,
+                    accountId = transaction.accountId,
+                    isTransfer = transaction.isTransfer
                 )
                 viewModel.deleteTransaction(transactionItem)
                 Snackbar.make(
@@ -173,9 +193,13 @@ class DashboardFragment :
         val (totalIncome, totalExpense) = transaction.partition { it.transactionType == "Income" }
         val income = totalIncome.sumOf { it.amount }
         val expense = totalExpense.sumOf { it.amount }
-        incomeCardView.total.text = "+ ".plus(indianRupee(income))
-        expenseCardView.total.text = "- ".plus(indianRupee(expense))
-        totalBalanceView.totalBalance.text = indianRupee(income - expense)
+        lifecycleScope.launchWhenStarted {
+            viewModel.currencySymbol.collect { symbol ->
+                incomeCardView.total.text = "+ $symbol".plus(income)
+                expenseCardView.total.text = "- $symbol".plus(expense)
+                totalBalanceView.totalBalance.text = "$symbol".plus((income - expense))
+            }
+        }
     }
 
     private fun observeTransaction() = lifecycleScope.launchWhenStarted {
@@ -209,6 +233,30 @@ class DashboardFragment :
     private fun hideAllViews() = with(binding) {
         dashboardGroup.hide()
         emptyStateLayout.show()
+        val hasAccounts = viewModel.allAccounts.value.isNotEmpty()
+        if (hasAccounts) {
+            root.findViewById<TextView>(R.id.empty_state_title)?.text =
+                getString(R.string.text_transaction_empty_title)
+            root.findViewById<TextView>(R.id.empty_state_description)?.text =
+                getString(R.string.text_transaction_empty_desc)
+            root.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnAddAccountFirst)?.apply {
+                text = getString(R.string.text_manage_accounts)
+                setOnClickListener {
+                    findNavController().navigate(R.id.action_dashboardFragment_to_accountFragment)
+                }
+            }
+        } else {
+            root.findViewById<TextView>(R.id.empty_state_title)?.text =
+                getString(R.string.text_account_empty_title)
+            root.findViewById<TextView>(R.id.empty_state_description)?.text =
+                getString(R.string.text_account_empty_desc)
+            root.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnAddAccountFirst)?.apply {
+                text = getString(R.string.text_add_account_first)
+                setOnClickListener {
+                    findNavController().navigate(R.id.action_dashboardFragment_to_accountFragment)
+                }
+            }
+        }
     }
 
     private fun onTransactionLoaded(list: List<Transaction>) =
@@ -219,12 +267,17 @@ class DashboardFragment :
             findNavController().navigate(R.id.action_dashboardFragment_to_addTransactionFragment)
         }
 
+        btnManageAccounts.setOnClickListener {
+            findNavController().navigate(R.id.action_dashboardFragment_to_accountFragment)
+        }
+
         mainDashboardScrollView.setOnScrollChangeListener(
             NestedScrollView.OnScrollChangeListener { _, sX, sY, oX, oY ->
                 if (abs(sY - oY) > 10) {
+                    val hasAccounts = viewModel.allAccounts.value.isNotEmpty()
                     when {
                         sY > oY -> btnAddTransaction.hide()
-                        oY > sY -> btnAddTransaction.show()
+                        oY > sY -> if (hasAccounts) btnAddTransaction.show()
                     }
                 }
             }
@@ -248,47 +301,90 @@ class DashboardFragment :
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         inflater.inflate(R.menu.menu_ui, menu)
+        val compactDropDownWidth = resources.getDimensionPixelSize(R.dimen.dimen_150)
 
-        val item = menu.findItem(R.id.spinner)
-        val spinner = item.actionView as Spinner
+        // Type filter spinner
+        val typeItem = menu.findItem(R.id.spinner)
+        val typeSpinner = typeItem.actionView as Spinner
+        typeSpinner.dropDownWidth = compactDropDownWidth
+        typeSpinner.dropDownHorizontalOffset = 0
 
-        val adapter = ArrayAdapter.createFromResource(
+        val typeItems = listOf("Overall", "All Income", "All Expense")
+        val typeAdapter = ArrayAdapter(
             applicationContext(),
-            R.array.allFilters,
-            R.layout.item_filter_dropdown
+            R.layout.item_filter_spinner_compact,
+            typeItems
         )
-        adapter.setDropDownViewResource(R.layout.item_filter_dropdown)
-        spinner.adapter = adapter
+        typeAdapter.setDropDownViewResource(R.layout.item_filter_dropdown)
+        typeSpinner.adapter = typeAdapter
 
-        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+        val currentType = viewModel.typeFilter.value
+        typeSpinner.setSelection(
+            when (currentType) {
+                "Income" -> 1
+                "Expense" -> 2
+                else -> 0
+            }
+        )
+
+        typeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
                 parent: AdapterView<*>?,
                 view: View?,
                 position: Int,
                 id: Long
             ) {
-                lifecycleScope.launchWhenStarted {
-                    when (position) {
-                        0 -> {
-                            viewModel.overall()
-                            (view as TextView).setTextColor(resources.getColor(R.color.black))
-                        }
-                        1 -> {
-                            viewModel.allIncome()
-                            (view as TextView).setTextColor(resources.getColor(R.color.black))
-                        }
-                        2 -> {
-                            viewModel.allExpense()
-                            (view as TextView).setTextColor(resources.getColor(R.color.black))
-                        }
-                    }
+                val type = when (position) {
+                    1 -> "Income"
+                    2 -> "Expense"
+                    else -> "Overall"
                 }
+                viewModel.setTypeFilter(type)
+                (view as? TextView)?.setTextColor(resources.getColor(R.color.black))
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) {
-                lifecycleScope.launchWhenStarted {
-                    viewModel.overall()
-                }
+                viewModel.setTypeFilter("Overall")
+            }
+        }
+
+        // Account filter spinner
+        val accountItem = menu.findItem(R.id.spinner_account)
+        val accountSpinner = accountItem.actionView as Spinner
+        accountSpinner.dropDownWidth = compactDropDownWidth
+        accountSpinner.dropDownHorizontalOffset = 0
+
+        val accounts = viewModel.allAccounts.value
+        val accountItems = listOf("All Accounts") + accounts.map { it.name }
+        val accountAdapter = ArrayAdapter(
+            applicationContext(),
+            R.layout.item_filter_spinner_compact,
+            accountItems
+        )
+        accountAdapter.setDropDownViewResource(R.layout.item_filter_dropdown)
+        accountSpinner.adapter = accountAdapter
+
+        val currentAccountId = viewModel.accountFilter.value
+        val accountIndex = if (currentAccountId == -1) 0 else {
+            val idx = accounts.indexOfFirst { it.id == currentAccountId }
+            if (idx >= 0) idx + 1 else 0
+        }
+        accountSpinner.setSelection(accountIndex)
+
+        accountSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                val accountId = if (position == 0) -1 else accounts[position - 1].id
+                viewModel.setAccountFilter(accountId)
+                (view as? TextView)?.setTextColor(resources.getColor(R.color.black))
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {
+                viewModel.setAccountFilter(-1)
             }
         }
 
@@ -309,16 +405,18 @@ class DashboardFragment :
                 setUIMode(item, item.isChecked)
                 true
             }
-
             R.id.action_about -> {
                 findNavController().navigate(R.id.action_dashboardFragment_to_aboutFragment)
                 true
             }
-
             R.id.action_export -> {
                 val csvFileName = "expenso_${System.currentTimeMillis()}"
                 csvCreateRequestLauncher.launch(csvFileName)
                 return true
+            }
+            R.id.action_settings -> {
+                findNavController().navigate(R.id.action_dashboardFragment_to_settingsFragment)
+                true
             }
             else -> super.onOptionsItemSelected(item)
         }
@@ -370,9 +468,11 @@ class DashboardFragment :
         if (isChecked) {
             viewModel.setDarkMode(true)
             item.setIcon(R.drawable.ic_night)
+            item.title = "Light Mode"
         } else {
             viewModel.setDarkMode(false)
             item.setIcon(R.drawable.ic_day)
+            item.title = "Dark Mode"
         }
     }
 }

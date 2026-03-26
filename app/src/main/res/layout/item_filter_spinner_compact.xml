@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="96dp"
+    android:layout_height="44dp"
+    android:ellipsize="end"
+    android:gravity="start|center_vertical"
+    android:maxLines="1"
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp"
+    android:textAlignment="viewStart"
+    android:textColor="@color/black"
+    android:textSize="14sp"
+    tools:text="Overall" />

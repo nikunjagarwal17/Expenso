@@ -5,6 +5,7 @@ import dev.spikeysanju.expensetracker.model.Transaction
 import javax.inject.Inject
 
 class TransactionRepo @Inject constructor(private val db: AppDatabase) {
+    suspend fun deleteAll() = db.getTransactionDao().deleteAllTransactions()
 
     // insert transaction
     suspend fun insert(transaction: Transaction) = db.getTransactionDao().insertTransaction(
@@ -36,4 +37,7 @@ class TransactionRepo @Inject constructor(private val db: AppDatabase) {
 
     // delete transaction by ID
     suspend fun deleteByID(id: Int) = db.getTransactionDao().deleteTransactionByID(id)
+
+    // get transactions by account
+    fun getTransactionsByAccount(accountId: Int) = db.getTransactionDao().getTransactionsByAccount(accountId)
 }

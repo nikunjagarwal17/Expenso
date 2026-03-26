@@ -28,9 +28,9 @@ fun saveBitmap(activity: Activity, bitmap: Bitmap, filename: String = DEFAULT_FI
         contentValues
     )
 
-    return imageUri.also {
-        val fileOutputStream = imageUri?.let { contentResolver.openOutputStream(it) }
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fileOutputStream)
-        fileOutputStream?.close()
+    return imageUri.also { uri ->
+        uri?.let { contentResolver.openOutputStream(it) }?.use { stream ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream)
+        }
     }
 }

@@ -45,4 +45,14 @@
         android:textAppearance="@style/TextAppearance.MaterialComponents.Body1"
         android:textColor="@color/black" />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAddAccountFirst"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/empty_state_description"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:text="Add Account First" />
+
 </RelativeLayout>

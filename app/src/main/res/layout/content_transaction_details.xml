@@ -93,19 +93,19 @@
 
 
         <TextView
-            android:id="@+id/caption_tag"
+            android:id="@+id/caption_account"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/dimen_16"
             android:layout_marginTop="@dimen/dimen_24"
             android:fontFamily="@font/open_sans_bold"
-            android:text="@string/text_expense_tag"
+            android:text="@string/text_account"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Caption"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/type" />
 
         <TextView
-            android:id="@+id/tag"
+            android:id="@+id/accountName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/dimen_16"
@@ -114,8 +114,8 @@
             android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
             android:textColor="@color/black"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/caption_tag"
-            tools:text="Personal Spendings" />
+            app:layout_constraintTop_toBottomOf="@id/caption_account"
+            tools:text="Cash" />
 
 
         <TextView
@@ -128,7 +128,7 @@
             android:text="@string/text_expense_when"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Caption"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tag" />
+            app:layout_constraintTop_toBottomOf="@id/accountName" />
 
         <TextView
             android:id="@+id/date"

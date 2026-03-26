@@ -32,7 +32,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/dimen_16"
-            android:layout_marginTop="@dimen/dimen_24"
+            android:layout_marginTop="@dimen/dimen_16"
             android:fontFamily="@font/open_sans_semibold"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
             app:layout_constraintStart_toEndOf="@id/transactionIconView"
@@ -40,16 +40,20 @@
             tools:text="Brochure Design" />
 
         <TextView
-            android:id="@+id/transactionCategory"
+            android:id="@+id/transactionDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/dimen_16"
-            android:layout_marginTop="@dimen/dimen_16"
+            android:layout_marginBottom="@dimen/dimen_16"
             android:fontFamily="@font/open_sans_regular"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Caption"
+            android:textColor="?android:attr/textColorSecondary"
             app:layout_constraintStart_toEndOf="@id/transactionIconView"
             app:layout_constraintTop_toBottomOf="@id/transactionName"
-            tools:text="Business work" />
+            app:layout_constraintBottom_toBottomOf="parent"
+            tools:text="12 March 2026" />
+
+
 
         <TextView
             android:id="@+id/transactionAmount"

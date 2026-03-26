@@ -95,7 +95,8 @@ class TransactionDetailsFragment : BaseFragment<FragmentTransactionDetailsBindin
         title.text = transaction.title
         amount.text = indianRupee(transaction.amount).cleanTextContent
         type.text = transaction.transactionType
-        tag.text = transaction.tag
+        val account = viewModel.allAccounts.value.find { it.id == transaction.accountId }
+        accountName.text = account?.name ?: "Default"
         date.text = transaction.date
         note.text = transaction.note
         createdAt.text = transaction.createdAtDateFormat
@@ -178,7 +179,7 @@ class TransactionDetailsFragment : BaseFragment<FragmentTransactionDetailsBindin
             transactionDetails.title.text.toString(),
             transactionDetails.amount.text.toString(),
             transactionDetails.type.text.toString(),
-            transactionDetails.tag.text.toString(),
+            transactionDetails.accountName.text.toString(),
             transactionDetails.date.text.toString(),
             transactionDetails.note.text.toString(),
             transactionDetails.createdAt.text.toString()

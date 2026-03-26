@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="@dimen/dimen_16">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/open_sans_semibold"
+        android:text="@string/text_from_account"
+        android:textAppearance="@style/TextAppearance.MaterialComponents.Caption" />
+
+    <Spinner
+        android:id="@+id/spinnerFromAccount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/dimen_8" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/dimen_16"
+        android:fontFamily="@font/open_sans_semibold"
+        android:text="@string/text_to_account"
+        android:textAppearance="@style/TextAppearance.MaterialComponents.Caption" />
+
+    <Spinner
+        android:id="@+id/spinnerToAccount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/dimen_8" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/dialogTransferAmountLayout"
+        style="@style/PrimaryEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/dimen_16"
+        android:hint="@string/text_expense_amount">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/dialogTransferAmount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/open_sans_regular"
+            android:inputType="numberDecimal" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/dialogTaxAmountLayout"
+        style="@style/PrimaryEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/dimen_16"
+        android:hint="@string/text_tax">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/dialogTaxAmount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/open_sans_regular"
+            android:inputType="numberDecimal"
+            android:text="0" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+</LinearLayout>

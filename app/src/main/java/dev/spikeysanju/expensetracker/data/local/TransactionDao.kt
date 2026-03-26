@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransactionDao {
+    @Query("DELETE FROM all_transactions")
+    suspend fun deleteAllTransactions()
 
     // used to insert new transaction
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -34,4 +36,8 @@ interface TransactionDao {
     // delete transaction by id
     @Query("DELETE FROM all_transactions WHERE id = :id")
     suspend fun deleteTransactionByID(id: Int)
+
+    // get all transactions by account id
+    @Query("SELECT * FROM all_transactions WHERE accountId = :accountId ORDER by createdAt DESC")
+    fun getTransactionsByAccount(accountId: Int): Flow<List<Transaction>>
 }
