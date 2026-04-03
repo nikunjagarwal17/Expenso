@@ -65,7 +65,7 @@ class TransactionDetailsFragment : BaseFragment<FragmentTransactionDetailsBindin
         observeTransaction()
     }
 
-    private fun getTransaction(id: Int) {
+    private fun getTransaction(id: String) {
         viewModel.getByID(id)
     }
 
@@ -120,7 +120,7 @@ class TransactionDetailsFragment : BaseFragment<FragmentTransactionDetailsBindin
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_delete -> {
-                viewModel.deleteByID(args.transaction.id)
+                viewModel.deleteTransaction(args.transaction, requireContext())
                     .run {
                         findNavController().navigateUp()
                     }

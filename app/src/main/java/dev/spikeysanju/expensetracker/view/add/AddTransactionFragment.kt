@@ -27,7 +27,7 @@ class AddTransactionFragment :
     BaseFragment<FragmentAddTransactionBinding, TransactionViewModel>() {
     override val viewModel: TransactionViewModel by activityViewModels()
 
-    private var selectedAccountId: Int = 0
+    private var selectedAccountId: String = ""
     private var selectedAccountName: String = ""
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -118,7 +118,7 @@ class AddTransactionFragment :
                         date.isEmpty() -> {
                             this.etWhen.error = "Date must not be empty"
                         }
-                        selectedAccountId == 0 -> {
+                        selectedAccountId.isBlank() -> {
                             this.etAccount.error = "Please select an account"
                         }
                         else -> {
@@ -134,7 +134,7 @@ class AddTransactionFragment :
                                     return@setOnClickListener
                                 }
                             }
-                            viewModel.insertTransaction(getTransactionContent()).run {
+                            viewModel.insertTransaction(getTransactionContent(), requireContext()).run {
                                 binding.root.snack(
                                     string = R.string.success_expense_saved
                                 )

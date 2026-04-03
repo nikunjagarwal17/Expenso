@@ -173,7 +173,7 @@ class DashboardFragment :
                     accountId = transaction.accountId,
                     isTransfer = transaction.isTransfer
                 )
-                viewModel.deleteTransaction(transactionItem)
+                    viewModel.deleteTransaction(transactionItem, requireContext())
                 Snackbar.make(
                     binding.root,
                     getString(R.string.success_transaction_delete),
@@ -182,7 +182,8 @@ class DashboardFragment :
                     .apply {
                         setAction(getString(R.string.text_undo)) {
                             viewModel.insertTransaction(
-                                transactionItem
+                                transactionItem,
+                                requireContext()
                             )
                         }
                         show()
@@ -372,7 +373,7 @@ class DashboardFragment :
         accountSpinner.adapter = accountAdapter
 
         val currentAccountId = viewModel.accountFilter.value
-        val accountIndex = if (currentAccountId == -1) 0 else {
+        val accountIndex = if (currentAccountId == null) 0 else {
             val idx = accounts.indexOfFirst { it.id == currentAccountId }
             if (idx >= 0) idx + 1 else 0
         }
@@ -385,13 +386,13 @@ class DashboardFragment :
                 position: Int,
                 id: Long
             ) {
-                val accountId = if (position == 0) -1 else accounts[position - 1].id
+                val accountId = if (position == 0) null else accounts[position - 1].id
                 viewModel.setAccountFilter(accountId)
                 (view as? TextView)?.setTextColor(resources.getColor(R.color.black))
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) {
-                viewModel.setAccountFilter(-1)
+                viewModel.setAccountFilter(null)
             }
         }
 
@@ -429,7 +430,7 @@ class DashboardFragment :
             }
             R.id.action_login_signup -> {
                 if (AuthSessionManager.isLoggedIn(requireContext())) {
-                    AuthSessionManager.setLoggedIn(requireContext(), false)
+                    AuthSessionManager.clearSession(requireContext())
                     binding.root.snack(string = R.string.text_logged_out)
                     findNavController().navigate(
                         R.id.authWelcomeFragment,

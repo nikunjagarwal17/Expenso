@@ -20,8 +20,8 @@ class AccountRepo @Inject constructor(private val db: AppDatabase) {
     fun getAllAccounts() = db.getAccountDao().getAllAccounts()
 
     // get account by ID
-    fun getByID(id: Int) = db.getAccountDao().getAccountByID(id)
+    fun getByID(id: String) = db.getAccountDao().getAccountByID(id)
 
     // get account by ID synchronously
-    suspend fun getByIDSync(id: Int) = db.getAccountDao().getAccountByIDSync(id)
+    suspend fun getByIDSync(id: String) = db.getAccountDao().getAccountByIDSync(id)
 }

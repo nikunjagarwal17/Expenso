@@ -55,7 +55,7 @@ class ExportCsvService @Inject constructor(
         )
 
         // Build row data with per-account running balances
-        val accountRunningBalances = mutableMapOf<Int, Double>()
+        val accountRunningBalances = mutableMapOf<String, Double>()
         accounts.forEach { accountRunningBalances[it.id] = 0.0 }
         val rows = sortedTransactions.map { transaction ->
             when (transaction.transactionType) {
@@ -66,7 +66,7 @@ class ExportCsvService @Inject constructor(
             }
             val totalBalance = accountRunningBalances.values.sum()
             val accountBalancesSnapshot = sortedAccountNames.associateWith { name ->
-                val accountId = accounts.find { it.name == name }?.id ?: 0
+                val accountId = accounts.find { it.name == name }?.id ?: ""
                 accountRunningBalances[accountId] ?: 0.0
             }
             val formattedDate = try {

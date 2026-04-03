@@ -6,6 +6,21 @@ plugins {
     id("dagger.hilt.android.plugin")
 }
 
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(localPropertiesFile.inputStream())
+    }
+}
+
+val supabaseUrl =
+    (localProperties.getProperty("SUPABASE_URL") ?: "https://ajkelgowxwnwtflclaea.supabase.co").trim()
+val supabasePublishableKey =
+    (localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY")
+        ?: "sb_publishable_LbUyfLmRwzUjIiqs3e3-iQ_aixl718B").trim()
+
 android {
     compileSdk = 34
 
@@ -20,6 +35,18 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField(
+            "String",
+            "SUPABASE_FUNCTIONS_BASE_URL",
+            "\"$supabaseUrl/functions/v1/\""
+        )
+        buildConfigField(
+            "String",
+            "SUPABASE_PUBLISHABLE_KEY",
+            "\"$supabasePublishableKey\""
+        )
     }
 
     lint {
@@ -29,6 +56,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 
     buildTypes {
@@ -106,6 +134,13 @@ dependencies {
     kapt("androidx.hilt:hilt-compiler:1.1.0")
 
     implementation("androidx.hilt:hilt-common:1.1.0")
+
+    // Network
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.google.code.gson:gson:2.11.0")
 
 }
 

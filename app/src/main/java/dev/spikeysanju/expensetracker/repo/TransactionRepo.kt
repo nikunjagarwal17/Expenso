@@ -33,11 +33,11 @@ class TransactionRepo @Inject constructor(private val db: AppDatabase) {
     }
 
     // get transaction by ID
-    fun getByID(id: Int) = db.getTransactionDao().getTransactionByID(id)
+    fun getByID(id: String) = db.getTransactionDao().getTransactionByID(id)
 
     // delete transaction by ID
-    suspend fun deleteByID(id: Int) = db.getTransactionDao().deleteTransactionByID(id)
+    suspend fun deleteByID(id: String) = db.getTransactionDao().deleteTransactionByID(id)
 
     // get transactions by account
-    fun getTransactionsByAccount(accountId: Int) = db.getTransactionDao().getTransactionsByAccount(accountId)
+    fun getTransactionsByAccount(accountId: String) = db.getTransactionDao().getTransactionsByAccount(accountId)
 }

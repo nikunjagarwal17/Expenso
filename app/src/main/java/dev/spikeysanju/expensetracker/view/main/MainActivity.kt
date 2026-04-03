@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         initViews(binding)
         observeThemeMode()
         observeNavElements(binding, navHostFragment.navController)
+        viewModel.syncFromRemoteIfLoggedIn(this)
     }
 
     private fun observeThemeMode() {

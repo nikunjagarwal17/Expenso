@@ -57,7 +57,7 @@ class AccountFragment : BaseFragment<FragmentAccountBinding, TransactionViewMode
                 .setTitle(getString(R.string.text_delete))
                 .setMessage("Delete account \"${account.name}\"?")
                 .setPositiveButton("Yes") { _, _ ->
-                    viewModel.deleteAccount(account)
+                    viewModel.deleteAccount(account, requireContext())
                     Toast.makeText(requireContext(), getString(R.string.text_account_deleted), Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("No", null)
@@ -91,7 +91,7 @@ class AccountFragment : BaseFragment<FragmentAccountBinding, TransactionViewMode
                 val balance = parseDouble(balanceInput.text.toString())
 
                 if (name.isNotEmpty() && !balance.isNaN()) {
-                    viewModel.insertAccount(Account(name = name, balance = balance))
+                    viewModel.insertAccount(Account(name = name, balance = balance), requireContext())
                 } else {
                     Toast.makeText(requireContext(), "Please fill all fields", Toast.LENGTH_SHORT).show()
                 }
@@ -147,7 +147,8 @@ class AccountFragment : BaseFragment<FragmentAccountBinding, TransactionViewMode
                     fromAccountId = accounts[fromIndex].id,
                     toAccountId = accounts[toIndex].id,
                     amount = amount,
-                    taxAmount = tax
+                    taxAmount = tax,
+                    context = requireContext()
                 )
                 Toast.makeText(requireContext(), getString(R.string.text_transfer_success), Toast.LENGTH_SHORT).show()
             }

@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.io.Serializable
 import java.text.DateFormat
+import java.util.UUID
 
 @Entity(tableName = "all_transactions")
 data class Transaction(
@@ -24,11 +25,11 @@ data class Transaction(
     @ColumnInfo(name = "createdAt")
     var createdAt: Long =
         System.currentTimeMillis(),
-    @PrimaryKey(autoGenerate = true)
+    @PrimaryKey
     @ColumnInfo(name = "id")
-    var id: Int = 0,
-    @ColumnInfo(name = "accountId", defaultValue = "0")
-    var accountId: Int = 0,
+    var id: String = UUID.randomUUID().toString(),
+    @ColumnInfo(name = "accountId", defaultValue = "")
+    var accountId: String = "",
     @ColumnInfo(name = "isTransfer", defaultValue = "0")
     var isTransfer: Boolean = false,
 ) : Serializable {

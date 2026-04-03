@@ -28,7 +28,7 @@ class EditTransactionFragment : BaseFragment<FragmentEditTransactionBinding, Tra
     private val args: EditTransactionFragmentArgs by navArgs()
     override val viewModel: TransactionViewModel by activityViewModels()
 
-    private var selectedAccountId: Int = 0
+    private var selectedAccountId: String = ""
     private var selectedAccountName: String = ""
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -138,7 +138,7 @@ class EditTransactionFragment : BaseFragment<FragmentEditTransactionBinding, Tra
                         this.etWhen.error = "Date must not be empty"
                     }
                     else -> {
-                        viewModel.updateTransaction(getTransactionContent()).also {
+                        viewModel.updateTransaction(getTransactionContent(), requireContext()).also {
 
                             binding.root.snack(
                                 string = R.string.success_expense_saved

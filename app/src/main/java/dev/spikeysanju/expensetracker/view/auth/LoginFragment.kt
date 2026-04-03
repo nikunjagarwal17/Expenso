@@ -4,13 +4,23 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import dagger.hilt.android.AndroidEntryPoint
 import dev.spikeysanju.expensetracker.R
 import dev.spikeysanju.expensetracker.databinding.FragmentLoginBinding
-import dev.spikeysanju.expensetracker.utils.AuthSessionManager
+import dev.spikeysanju.expensetracker.data.remote.client.ApiResult
+import dev.spikeysanju.expensetracker.repo.AuthRepo
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class LoginFragment : Fragment() {
+    @Inject
+    lateinit var authRepo: AuthRepo
+
     private var _binding: FragmentLoginBinding? = null
     private val binding get() = _binding!!
 
@@ -37,9 +47,24 @@ class LoginFragment : Fragment() {
                 email.isEmpty() -> binding.tilEmail.error = getString(R.string.text_email_required)
                 password.isEmpty() -> binding.tilPassword.error = getString(R.string.text_password_required)
                 else -> {
-                    // TODO: Replace with real authentication logic.
-                    AuthSessionManager.setLoggedIn(requireContext(), true)
-                    findNavController().navigate(R.id.action_loginFragment_to_dashboardFragment)
+                    binding.btnLogin.isEnabled = false
+                    lifecycleScope.launch {
+                        when (val result = authRepo.login(requireContext(), email, password)) {
+                            is ApiResult.Success -> {
+                                Toast.makeText(
+                                    requireContext(),
+                                    getString(R.string.text_login_success),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                findNavController().navigate(R.id.action_loginFragment_to_dashboardFragment)
+                            }
+
+                            is ApiResult.Error -> {
+                                binding.tilPassword.error = result.message
+                            }
+                        }
+                        binding.btnLogin.isEnabled = true
+                    }
                 }
             }
         }

@@ -35,7 +35,7 @@ class AuthWelcomeFragment : Fragment() {
         }
 
         binding.btnContinueWithoutLogin.setOnClickListener {
-            AuthSessionManager.setLoggedIn(requireContext(), false)
+            AuthSessionManager.clearSession(requireContext())
             findNavController().navigate(R.id.action_authWelcomeFragment_to_dashboardFragment)
         }
     }

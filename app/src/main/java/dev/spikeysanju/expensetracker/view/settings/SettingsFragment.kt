@@ -88,7 +88,7 @@ class SettingsFragment : Fragment() {
 
         binding.authActionLayout.setOnClickListener {
             if (AuthSessionManager.isLoggedIn(requireContext())) {
-                AuthSessionManager.setLoggedIn(requireContext(), false)
+                AuthSessionManager.clearSession(requireContext())
                 Snackbar.make(binding.root, getString(R.string.text_logged_out), Snackbar.LENGTH_SHORT)
                     .show()
 
@@ -306,7 +306,13 @@ class SettingsFragment : Fragment() {
             else if (line.isBlank() || line.startsWith("id,")) continue
             else if (mode == "accounts") {
                 val parts = line.split(",")
-                if (parts.size >= 3) accounts.add(dev.spikeysanju.expensetracker.model.Account(parts[0].toInt(), parts[1], parts[2].toDouble()))
+                if (parts.size >= 3) accounts.add(
+                    dev.spikeysanju.expensetracker.model.Account(
+                        id = parts[0],
+                        name = parts[1],
+                        balance = parts[2].toDouble()
+                    )
+                )
             } else if (mode == "transactions") {
                 val parts = line.split(",")
                 if (parts.size >= 10) transactions.add(
@@ -318,8 +324,8 @@ class SettingsFragment : Fragment() {
                         date = parts[5],
                         note = parts[6],
                         createdAt = parts[7].toLong(),
-                        id = parts[0].toInt(),
-                        accountId = parts[8].toInt(),
+                        id = parts[0],
+                        accountId = parts[8],
                         isTransfer = parts[9].toBoolean()
                     )
                 )

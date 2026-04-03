@@ -4,12 +4,13 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.io.Serializable
+import java.util.UUID
 
 @Entity(tableName = "accounts")
 data class Account(
-    @PrimaryKey(autoGenerate = true)
+    @PrimaryKey
     @ColumnInfo(name = "id")
-    var id: Int = 0,
+    var id: String = UUID.randomUUID().toString(),
     @ColumnInfo(name = "name")
     var name: String,
     @ColumnInfo(name = "balance")
