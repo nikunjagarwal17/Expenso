@@ -29,6 +29,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/action_login_signup"
+        android:enabled="true"
+        android:title="@string/text_login_signup"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_export"
         android:enabled="true"
         android:title="@string/text_export_csv"

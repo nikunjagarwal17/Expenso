@@ -46,6 +46,25 @@
     <string name="text_import_export">Import/Export Data</string>
     <string name="select_currency">Select Currency Symbol</string>
     <string name="import_export">Import/Export Data</string>
+    <string name="text_login_signup">Login / Signup</string>
+
+    <!-- Auth -->
+    <string name="text_welcome_title">Welcome to Expenso</string>
+    <string name="text_welcome_subtitle">Sign in to sync your data or continue without login.</string>
+    <string name="text_login">Login</string>
+    <string name="text_signup">Sign up</string>
+    <string name="text_continue_without_login">Continue without login</string>
+    <string name="text_email">Email</string>
+    <string name="text_password">Password</string>
+    <string name="text_login_subtitle">Enter your email and password to continue.</string>
+    <string name="text_signup_subtitle">Create your account with email and password.</string>
+    <string name="text_dont_have_account">Don\'t have an account? Sign up</string>
+    <string name="text_already_have_account">Already have an account? Login</string>
+    <string name="text_back">Back</string>
+    <string name="text_email_required">Email is required</string>
+    <string name="text_password_required">Password is required</string>
+    <string name="text_logout">Logout</string>
+    <string name="text_logged_out">Logged out successfully</string>
 
     <!-- share transaction -->
     <string name="share_message">\%s \nAmount: %s, \nTransaction-Type: %s, \nAccount: %s, \nDate: %s, \nNote: %s, \nCreatedAt: %s</string>

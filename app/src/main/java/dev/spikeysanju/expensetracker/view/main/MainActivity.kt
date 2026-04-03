@@ -1,6 +1,9 @@
 package dev.spikeysanju.expensetracker.view.main
 
 import android.os.Bundle
+import android.util.TypedValue
+import android.view.View
+import android.view.ViewGroup
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -65,7 +68,21 @@ class MainActivity : AppCompatActivity() {
         navController: NavController
     ) {
         navController.addOnDestinationChangedListener { _, destination, _ ->
+            val shouldHideAppBar = destination.id == R.id.authWelcomeFragment
+            binding.appbar.visibility = if (shouldHideAppBar) View.GONE else View.VISIBLE
+
+            val navHostLayoutParams = binding.navHostFragment.layoutParams as ViewGroup.MarginLayoutParams
+            navHostLayoutParams.topMargin = if (shouldHideAppBar) {
+                0
+            } else {
+                getActionBarHeight()
+            }
+            binding.navHostFragment.layoutParams = navHostLayoutParams
+
             when (destination.id) {
+                R.id.authWelcomeFragment -> {
+                    supportActionBar!!.setDisplayShowTitleEnabled(false)
+                }
 
                 R.id.dashboardFragment -> {
                     supportActionBar!!.setDisplayShowTitleEnabled(false)
@@ -74,10 +91,27 @@ class MainActivity : AppCompatActivity() {
                     supportActionBar!!.setDisplayShowTitleEnabled(true)
                     binding.toolbar.title = getString(R.string.text_add_transaction)
                 }
+                R.id.loginFragment -> {
+                    supportActionBar!!.setDisplayShowTitleEnabled(true)
+                    binding.toolbar.title = getString(R.string.text_login)
+                }
+                R.id.signupFragment -> {
+                    supportActionBar!!.setDisplayShowTitleEnabled(true)
+                    binding.toolbar.title = getString(R.string.text_signup)
+                }
                 else -> {
                     supportActionBar!!.setDisplayShowTitleEnabled(true)
                 }
             }
+        }
+    }
+
+    private fun getActionBarHeight(): Int {
+        val typedValue = TypedValue()
+        return if (theme.resolveAttribute(android.R.attr.actionBarSize, typedValue, true)) {
+            resources.getDimensionPixelSize(typedValue.resourceId)
+        } else {
+            0
         }
     }
 
@@ -90,7 +124,12 @@ class MainActivity : AppCompatActivity() {
             ?: return
 
         with(navHostFragment.navController) {
-            appBarConfiguration = AppBarConfiguration(graph)
+            appBarConfiguration = AppBarConfiguration(
+                setOf(
+                    R.id.authWelcomeFragment,
+                    R.id.dashboardFragment
+                )
+            )
             setupActionBarWithNavController(this, appBarConfiguration)
         }
     }

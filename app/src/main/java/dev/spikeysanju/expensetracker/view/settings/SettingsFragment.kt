@@ -2,15 +2,16 @@ package dev.spikeysanju.expensetracker.view.settings
 
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import androidx.fragment.app.Fragment
+import androidx.navigation.NavOptions
+import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dev.spikeysanju.expensetracker.R
 import dev.spikeysanju.expensetracker.databinding.FragmentSettingsBinding
+import dev.spikeysanju.expensetracker.utils.AuthSessionManager
 
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -83,6 +84,26 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        updateAuthActionLabel()
+
+        binding.authActionLayout.setOnClickListener {
+            if (AuthSessionManager.isLoggedIn(requireContext())) {
+                AuthSessionManager.setLoggedIn(requireContext(), false)
+                Snackbar.make(binding.root, getString(R.string.text_logged_out), Snackbar.LENGTH_SHORT)
+                    .show()
+
+                findNavController().navigate(
+                    R.id.authWelcomeFragment,
+                    null,
+                    NavOptions.Builder()
+                        .setPopUpTo(R.id.dashboardFragment, true)
+                        .build()
+                )
+            } else {
+                findNavController().navigate(R.id.authWelcomeFragment)
+            }
+        }
+
         binding.currencyLayout.setOnClickListener {
             showCurrencyDialog()
         }
@@ -97,6 +118,20 @@ class SettingsFragment : Fragment() {
         } catch (e: Exception) {
             // UI element doesn't exist yet, that's fine
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateAuthActionLabel()
+    }
+
+    private fun updateAuthActionLabel() {
+        val actionText = if (AuthSessionManager.isLoggedIn(requireContext())) {
+            getString(R.string.text_logout)
+        } else {
+            getString(R.string.text_login_signup)
+        }
+        binding.tvAuthAction.text = actionText
     }
 
     private fun showCurrencyDialog() {

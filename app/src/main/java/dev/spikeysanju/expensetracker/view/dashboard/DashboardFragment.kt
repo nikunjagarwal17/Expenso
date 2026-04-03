@@ -21,6 +21,7 @@ import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.NavOptions
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -32,6 +33,7 @@ import dev.spikeysanju.expensetracker.databinding.FragmentDashboardBinding
 import dev.spikeysanju.expensetracker.model.Transaction
 import dev.spikeysanju.expensetracker.services.exportcsv.CreateCsvContract
 import dev.spikeysanju.expensetracker.services.exportcsv.OpenCsvContract
+import dev.spikeysanju.expensetracker.utils.AuthSessionManager
 import dev.spikeysanju.expensetracker.utils.viewState.ExportState
 import dev.spikeysanju.expensetracker.utils.viewState.ViewState
 import dev.spikeysanju.expensetracker.view.adapter.TransactionAdapter
@@ -81,6 +83,11 @@ class DashboardFragment :
         observeTransaction()
         observeAccounts()
         swipeToDelete()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        requireActivity().invalidateOptionsMenu()
     }
 
     private fun observeAccounts() {
@@ -395,6 +402,17 @@ class DashboardFragment :
             uiMode.isChecked = isChecked
             setUIMode(uiMode, isChecked)
         }
+
+        updateAuthMenuItem(menu)
+    }
+
+    private fun updateAuthMenuItem(menu: Menu) {
+        val authItem = menu.findItem(R.id.action_login_signup)
+        authItem.title = if (AuthSessionManager.isLoggedIn(requireContext())) {
+            getString(R.string.text_logout)
+        } else {
+            getString(R.string.text_login_signup)
+        }
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -407,6 +425,22 @@ class DashboardFragment :
             }
             R.id.action_about -> {
                 findNavController().navigate(R.id.action_dashboardFragment_to_aboutFragment)
+                true
+            }
+            R.id.action_login_signup -> {
+                if (AuthSessionManager.isLoggedIn(requireContext())) {
+                    AuthSessionManager.setLoggedIn(requireContext(), false)
+                    binding.root.snack(string = R.string.text_logged_out)
+                    findNavController().navigate(
+                        R.id.authWelcomeFragment,
+                        null,
+                        NavOptions.Builder()
+                            .setPopUpTo(R.id.dashboardFragment, true)
+                            .build()
+                    )
+                } else {
+                    findNavController().navigate(R.id.action_dashboardFragment_to_authWelcomeFragment)
+                }
                 true
             }
             R.id.action_export -> {
