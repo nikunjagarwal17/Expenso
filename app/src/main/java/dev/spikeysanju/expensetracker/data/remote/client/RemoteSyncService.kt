@@ -67,15 +67,29 @@ class RemoteSyncService @Inject constructor(
                         return@forEach
                     }
 
-                    when (val created = expenseApiClient.createAccount(local.name, local.balance)) {
+                    val inferredOpeningBalance = inferOpeningBalance(local, localTransactions)
+
+                    when (val created = expenseApiClient.createAccount(local.name, inferredOpeningBalance)) {
                         is ApiResult.Success -> {
                             remoteAccounts.add(created.data)
                             localToRemoteAccountId[local.id] = created.data.id
                         }
 
                         is ApiResult.Error -> {
-                            Log.e("RemoteSyncService", "Failed to upload account '${local.name}': ${created.message}")
-                            SyncLogFile.append(appContext, "sync.upload_account_failed name=${local.name} error=${created.message}")
+                            val recovered = resolveExistingAccountByName(local.name)
+                            if (isAccountNameConflict(created.message) && recovered != null) {
+                                localToRemoteAccountId[local.id] = recovered.id
+                                if (remoteAccounts.none { it.id == recovered.id }) {
+                                    remoteAccounts.add(recovered)
+                                }
+                                SyncLogFile.append(
+                                    appContext,
+                                    "sync.upload_account_conflict_recovered name=${local.name} id=${recovered.id}"
+                                )
+                            } else {
+                                Log.e("RemoteSyncService", "Failed to upload account '${local.name}': ${created.message}")
+                                SyncLogFile.append(appContext, "sync.upload_account_failed name=${local.name} error=${created.message}")
+                            }
                         }
                     }
                 }
@@ -193,14 +207,129 @@ class RemoteSyncService @Inject constructor(
 
     suspend fun replaceRemoteWithLocal(): ApiResult<Unit> {
         return withContext(Dispatchers.IO) {
+            val localAccounts = db.getAccountDao().getAllAccounts().first()
+            val localTransactions = db.getTransactionDao().getAllTransactions().first()
+
             when (val wipe = wipeRemoteData()) {
                 is ApiResult.Error -> wipe
                 is ApiResult.Success -> {
                     SyncDeletionStore.clearAll(appContext)
-                    syncAllFromRemote(pushLocalChanges = true)
+                    when (val pushed = pushLocalSnapshotToRemote(localAccounts, localTransactions)) {
+                        is ApiResult.Error -> pushed
+                        is ApiResult.Success -> syncAllFromRemote(pushLocalChanges = false)
+                    }
                 }
             }
         }
+    }
+
+    private suspend fun pushLocalSnapshotToRemote(
+        localAccounts: List<Account>,
+        localTransactions: List<Transaction>
+    ): ApiResult<Unit> {
+        val localToRemoteAccountId = mutableMapOf<String, String>()
+
+        for (localAccount in localAccounts) {
+            val inferredOpeningBalance = inferOpeningBalance(localAccount, localTransactions)
+
+            when (val created = expenseApiClient.createAccount(localAccount.name, inferredOpeningBalance)) {
+                is ApiResult.Success -> {
+                    localToRemoteAccountId[localAccount.id] = created.data.id
+                }
+
+                is ApiResult.Error -> {
+                    val recovered = resolveExistingAccountByName(localAccount.name)
+                    if (isAccountNameConflict(created.message) && recovered != null) {
+                        localToRemoteAccountId[localAccount.id] = recovered.id
+                        SyncLogFile.append(
+                            appContext,
+                            "sync.keep_local_upload_account_conflict_recovered name=${localAccount.name} id=${recovered.id}"
+                        )
+                    } else {
+                        SyncLogFile.append(
+                            appContext,
+                            "sync.keep_local_upload_account_failed name=${localAccount.name} error=${created.message}"
+                        )
+                        return created
+                    }
+                }
+            }
+        }
+
+        val existingRemoteTransactions = when (val existing = expenseApiClient.getTransactions()) {
+            is ApiResult.Success -> existing.data.toMutableList()
+            is ApiResult.Error -> return existing
+        }
+
+        for (localTransaction in localTransactions) {
+            val remoteAccountId = localToRemoteAccountId[localTransaction.accountId] ?: continue
+            val occurredOn = toApiDate(localTransaction.date)
+
+            val duplicate = existingRemoteTransactions.any {
+                it.accountId == remoteAccountId &&
+                    it.title == localTransaction.title &&
+                    it.amount == localTransaction.amount &&
+                    it.transactionType == localTransaction.transactionType &&
+                    it.occurredOn == occurredOn &&
+                    it.note == localTransaction.note
+            }
+
+            if (duplicate) {
+                continue
+            }
+
+            val request = CreateTransactionRequest(
+                accountId = remoteAccountId,
+                title = localTransaction.title,
+                amount = localTransaction.amount,
+                transactionType = localTransaction.transactionType,
+                tag = localTransaction.tag,
+                occurredOn = occurredOn,
+                note = localTransaction.note,
+                isTransfer = localTransaction.isTransfer
+            )
+
+            when (val created = expenseApiClient.createTransaction(request)) {
+                is ApiResult.Success -> {
+                    existingRemoteTransactions.add(created.data)
+                }
+                is ApiResult.Error -> {
+                    SyncLogFile.append(
+                        appContext,
+                        "sync.keep_local_upload_tx_failed title=${localTransaction.title} error=${created.message}"
+                    )
+                    return created
+                }
+            }
+        }
+
+        SyncLogFile.append(appContext, "sync.keep_local_upload_complete")
+        return ApiResult.Success(Unit)
+    }
+
+    private suspend fun resolveExistingAccountByName(name: String): dev.spikeysanju.expensetracker.data.remote.dto.RemoteAccount? {
+        val accountsResult = expenseApiClient.getAccounts()
+        if (accountsResult !is ApiResult.Success) return null
+        return accountsResult.data.firstOrNull { it.name.equals(name, ignoreCase = true) }
+    }
+
+    private fun isAccountNameConflict(message: String): Boolean {
+        return message.contains("accounts_user_name_unique_idx", ignoreCase = true) ||
+            message.contains("duplicate key", ignoreCase = true)
+    }
+
+    private fun inferOpeningBalance(account: Account, allTransactions: List<Transaction>): Double {
+        val delta = allTransactions
+            .asSequence()
+            .filter { it.accountId == account.id }
+            .sumOf {
+                when (it.transactionType) {
+                    "Income" -> it.amount
+                    "Expense" -> -it.amount
+                    else -> 0.0
+                }
+            }
+        return account.balance - delta
     }
 
     private suspend fun processPendingDeletions() {

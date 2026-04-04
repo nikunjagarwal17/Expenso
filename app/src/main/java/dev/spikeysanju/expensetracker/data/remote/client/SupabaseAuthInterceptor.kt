@@ -11,13 +11,15 @@ class SupabaseAuthInterceptor(
     private val appContext: Context
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val token = AuthSessionManager.getAccessToken(appContext)
         val incomingRequest = chain.request()
+        val path = incomingRequest.url.encodedPath
+        val needsUserToken = path.contains("/functions/v1/expense-api/")
+        val token = if (needsUserToken) AuthSessionManager.getAccessToken(appContext) else null
 
         val requestBuilder = incomingRequest.newBuilder()
             .header("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY)
 
-        if (!token.isNullOrBlank()) {
+        if (needsUserToken && !token.isNullOrBlank()) {
             requestBuilder.header("Authorization", "Bearer $token")
             AuthSessionManager.touchSession(appContext)
         }
@@ -25,7 +27,7 @@ class SupabaseAuthInterceptor(
         val request = requestBuilder.build()
         SyncLogFile.append(
             appContext,
-            "http.request ${request.method} ${request.url.encodedPath} token_present=${!token.isNullOrBlank()} token_len=${token?.length ?: 0}"
+            "http.request ${request.method} ${request.url.encodedPath} token_required=$needsUserToken token_present=${!token.isNullOrBlank()} token_len=${token?.length ?: 0}"
         )
 
         val response = chain.proceed(request)

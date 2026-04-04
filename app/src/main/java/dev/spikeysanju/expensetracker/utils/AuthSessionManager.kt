@@ -40,9 +40,11 @@ object AuthSessionManager {
         refreshToken: String,
         expiresAtSeconds: Long
     ) {
+        val cleanAccessToken = sanitizeToken(accessToken)
+        val cleanRefreshToken = sanitizeToken(refreshToken)
         prefs(context).edit()
-            .putString(KEY_ACCESS_TOKEN, accessToken)
-            .putString(KEY_REFRESH_TOKEN, refreshToken)
+            .putString(KEY_ACCESS_TOKEN, cleanAccessToken)
+            .putString(KEY_REFRESH_TOKEN, cleanRefreshToken)
             .putLong(KEY_EXPIRES_AT_SECONDS, expiresAtSeconds)
             .putLong(KEY_LAST_ACTIVE_AT_MS, System.currentTimeMillis())
             .commit()
@@ -56,11 +58,11 @@ object AuthSessionManager {
     }
 
     fun getAccessToken(context: Context): String? {
-        return prefs(context).getString(KEY_ACCESS_TOKEN, null)
+        return prefs(context).getString(KEY_ACCESS_TOKEN, null)?.let { sanitizeToken(it) }
     }
 
     fun getRefreshToken(context: Context): String? {
-        return prefs(context).getString(KEY_REFRESH_TOKEN, null)
+        return prefs(context).getString(KEY_REFRESH_TOKEN, null)?.let { sanitizeToken(it) }
     }
 
     fun clearSession(context: Context) {
@@ -96,5 +98,13 @@ object AuthSessionManager {
 
         val nowEpochSeconds = System.currentTimeMillis() / 1000
         return nowEpochSeconds >= (expiresAtSeconds - 30)
+    }
+
+    private fun sanitizeToken(token: String): String {
+        return token
+            .trim()
+            .removeSurrounding("\"")
+            .replace("\r", "")
+            .replace("\n", "")
     }
 }

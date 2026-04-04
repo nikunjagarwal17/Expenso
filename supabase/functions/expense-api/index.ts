@@ -201,7 +201,61 @@ serve(async (req: Request) => {
       .single();
 
     if (error) {
-      return jsonResponse(req, 400, { error: error.message });
+      const isDuplicateName =
+        error.code === "23505" ||
+        error.message?.includes("accounts_user_name_unique_idx") ||
+        error.message?.toLowerCase().includes("duplicate key");
+
+      if (!isDuplicateName) {
+        return jsonResponse(req, 400, { error: error.message });
+      }
+
+      const { data: existingAccount, error: existingError } = await userClient
+        .from("accounts")
+        .select("id,name,opening_balance,current_balance,deleted_at,created_at,updated_at")
+        .eq("user_id", user.id)
+        .ilike("name", name)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError || !existingAccount) {
+        return jsonResponse(req, 400, { error: error.message });
+      }
+
+      if (existingAccount.deleted_at) {
+        const { data: restored, error: restoreError } = await userClient
+          .from("accounts")
+          .update({
+            name,
+            opening_balance: openingBalance,
+            current_balance: openingBalance,
+            deleted_at: null
+          })
+          .eq("id", existingAccount.id)
+          .eq("user_id", user.id)
+          .select("id,name,opening_balance,current_balance,created_at,updated_at")
+          .single();
+
+        if (restoreError) {
+          return jsonResponse(req, 400, { error: restoreError.message });
+        }
+
+        return jsonResponse(req, 200, { data: restored });
+      }
+
+      const { data: active, error: activeError } = await userClient
+        .from("accounts")
+        .select("id,name,opening_balance,current_balance,created_at,updated_at")
+        .eq("id", existingAccount.id)
+        .eq("user_id", user.id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (activeError || !active) {
+        return jsonResponse(req, 400, { error: error.message });
+      }
+
+      return jsonResponse(req, 200, { data: active });
     }
 
     return jsonResponse(req, 201, { data });
