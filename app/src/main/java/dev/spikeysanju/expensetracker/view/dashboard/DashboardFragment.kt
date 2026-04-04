@@ -83,6 +83,7 @@ class DashboardFragment :
         observeTransaction()
         observeAccounts()
         swipeToDelete()
+        viewModel.syncFromRemoteIfLoggedIn(requireContext())
     }
 
     override fun onResume() {

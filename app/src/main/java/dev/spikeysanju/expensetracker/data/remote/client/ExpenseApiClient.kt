@@ -11,6 +11,7 @@ import dev.spikeysanju.expensetracker.data.remote.dto.RemoteTransaction
 import dev.spikeysanju.expensetracker.data.remote.dto.UpdateAccountRequest
 import dev.spikeysanju.expensetracker.data.remote.dto.UpdateTransactionRequest
 import javax.inject.Inject
+import retrofit2.Response
 
 class ExpenseApiClient @Inject constructor(
     private val expenseApiService: ExpenseApiService,
@@ -22,7 +23,7 @@ class ExpenseApiClient @Inject constructor(
             if (response.isSuccessful) {
                 ApiResult.Success(response.body()?.data.orEmpty())
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -36,7 +37,7 @@ class ExpenseApiClient @Inject constructor(
                 response.body()?.data?.let { ApiResult.Success(it) }
                     ?: ApiResult.Error("Invalid server response")
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -51,7 +52,7 @@ class ExpenseApiClient @Inject constructor(
                 response.body()?.data?.let { ApiResult.Success(it) }
                     ?: ApiResult.Error("Invalid server response")
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -62,7 +63,7 @@ class ExpenseApiClient @Inject constructor(
             if (response.isSuccessful) {
                 ApiResult.Success(Unit)
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -73,7 +74,7 @@ class ExpenseApiClient @Inject constructor(
             if (response.isSuccessful) {
                 ApiResult.Success(response.body()?.data.orEmpty())
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -85,7 +86,7 @@ class ExpenseApiClient @Inject constructor(
                 response.body()?.data?.let { ApiResult.Success(it) }
                     ?: ApiResult.Error("Invalid server response")
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -100,7 +101,7 @@ class ExpenseApiClient @Inject constructor(
                 response.body()?.data?.let { ApiResult.Success(it) }
                     ?: ApiResult.Error("Invalid server response")
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -111,7 +112,7 @@ class ExpenseApiClient @Inject constructor(
             if (response.isSuccessful) {
                 ApiResult.Success(Unit)
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -122,9 +123,29 @@ class ExpenseApiClient @Inject constructor(
             if (response.isSuccessful) {
                 ApiResult.Success(Unit)
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
+    }
+
+    private fun buildError(response: Response<*>): ApiResult.Error {
+        val rawBody = runCatching { response.errorBody()?.string() }.getOrNull()
+        val parsed = parseError(rawBody)
+        val details = buildString {
+            append("HTTP ")
+            append(response.code())
+            if (response.message().isNotBlank()) {
+                append(" ")
+                append(response.message())
+            }
+            append(" | ")
+            append(parsed)
+            if (!rawBody.isNullOrBlank()) {
+                append(" | body=")
+                append(rawBody.take(500))
+            }
+        }
+        return ApiResult.Error(details, response.code())
     }
 
     private fun parseError(rawBody: String?): String {

@@ -18,14 +18,22 @@ import dev.spikeysanju.expensetracker.data.local.datastore.UIModeImpl
 import dev.spikeysanju.expensetracker.databinding.ActivityMainBinding
 import dev.spikeysanju.expensetracker.repo.TransactionRepo
 import dev.spikeysanju.expensetracker.services.exportcsv.ExportCsvService
+import dev.spikeysanju.expensetracker.utils.AuthSessionManager
+import dev.spikeysanju.expensetracker.utils.SyncLogFile
 import dev.spikeysanju.expensetracker.view.main.viewmodel.TransactionViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private lateinit var navHostFragment: NavHostFragment
     private lateinit var appBarConfiguration: AppBarConfiguration
+    private var periodicSyncJob: Job? = null
+    private val periodicSyncIntervalMs = 2 * 60 * 1000L
 
     @Inject
     lateinit var repo: TransactionRepo
@@ -49,7 +57,34 @@ class MainActivity : AppCompatActivity() {
         initViews(binding)
         observeThemeMode()
         observeNavElements(binding, navHostFragment.navController)
+        SyncLogFile.append(this, "main.onCreate -> trigger_sync")
         viewModel.syncFromRemoteIfLoggedIn(this)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (AuthSessionManager.isLoggedIn(this)) {
+            AuthSessionManager.touchSession(this)
+        }
+        startPeriodicSync()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        periodicSyncJob?.cancel()
+        periodicSyncJob = null
+    }
+
+    private fun startPeriodicSync() {
+        if (periodicSyncJob?.isActive == true) return
+
+        periodicSyncJob = lifecycleScope.launch {
+            while (isActive) {
+                SyncLogFile.append(this@MainActivity, "main.periodic_sync_tick")
+                viewModel.syncFromRemoteIfLoggedIn(this@MainActivity)
+                delay(periodicSyncIntervalMs)
+            }
+        }
     }
 
     private fun observeThemeMode() {

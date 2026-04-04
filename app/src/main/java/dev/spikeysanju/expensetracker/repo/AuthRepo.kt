@@ -4,6 +4,7 @@ import android.content.Context
 import dev.spikeysanju.expensetracker.data.remote.client.ApiResult
 import dev.spikeysanju.expensetracker.data.remote.client.AuthApiClient
 import dev.spikeysanju.expensetracker.utils.AuthSessionManager
+import dev.spikeysanju.expensetracker.utils.SyncLogFile
 import javax.inject.Inject
 
 class AuthRepo @Inject constructor(
@@ -26,6 +27,10 @@ class AuthRepo @Inject constructor(
                     refreshToken = result.data.refreshToken,
                     expiresAtSeconds = result.data.expiresAt
                 )
+                SyncLogFile.append(
+                    context,
+                    "auth.login_saved_session token_len=${result.data.accessToken.length} refresh_len=${result.data.refreshToken.length} exp=${result.data.expiresAt}"
+                )
                 ApiResult.Success(Unit)
             }
 
@@ -34,12 +39,12 @@ class AuthRepo @Inject constructor(
     }
 
     suspend fun refreshSessionIfNeeded(context: Context): ApiResult<Unit> {
-        val refreshToken = AuthSessionManager.getRefreshToken(context)
-            ?: return ApiResult.Error("No refresh token found")
-
         if (!AuthSessionManager.isAccessTokenExpired(context)) {
             return ApiResult.Success(Unit)
         }
+
+        val refreshToken = AuthSessionManager.getRefreshToken(context)
+            ?: return ApiResult.Error("No refresh token found")
 
         return when (val result = authApiClient.refresh(refreshToken)) {
             is ApiResult.Success -> {
@@ -48,6 +53,10 @@ class AuthRepo @Inject constructor(
                     accessToken = result.data.accessToken,
                     refreshToken = result.data.refreshToken,
                     expiresAtSeconds = result.data.expiresAt
+                )
+                SyncLogFile.append(
+                    context,
+                    "auth.refresh_saved_session token_len=${result.data.accessToken.length} refresh_len=${result.data.refreshToken.length} exp=${result.data.expiresAt}"
                 )
                 ApiResult.Success(Unit)
             }

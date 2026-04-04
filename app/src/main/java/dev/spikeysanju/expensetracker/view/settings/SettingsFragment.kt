@@ -1,17 +1,23 @@
 package dev.spikeysanju.expensetracker.view.settings
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import dev.spikeysanju.expensetracker.BuildConfig
 import dev.spikeysanju.expensetracker.R
 import dev.spikeysanju.expensetracker.databinding.FragmentSettingsBinding
 import dev.spikeysanju.expensetracker.utils.AuthSessionManager
+import dev.spikeysanju.expensetracker.utils.SyncLogFile
+import java.io.File
 
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -109,6 +115,12 @@ class SettingsFragment : Fragment() {
         }
         binding.importExportLayout.setOnClickListener {
             showImportExportDialog()
+        }
+        binding.syncDebugLogLayout.visibility =
+            if (BuildConfig.ENABLE_SYNC_DEBUG_BUTTON) View.VISIBLE else View.GONE
+        binding.tvSyncDebugLog.text = getString(R.string.text_export_sync_debug_log)
+        binding.syncDebugLogLayout.setOnClickListener {
+            exportSyncDebugLog()
         }
         // Add quick tiles management if the UI element exists
         try {
@@ -263,6 +275,27 @@ class SettingsFragment : Fragment() {
                 }
             }
             .show()
+    }
+
+    private fun exportSyncDebugLog() {
+        val syncLogFile = File(requireContext().filesDir, "sync.log")
+        if (!syncLogFile.exists() || syncLogFile.length() == 0L) {
+            Snackbar.make(binding.root, getString(R.string.text_sync_log_not_found), Snackbar.LENGTH_SHORT)
+                .show()
+            return
+        }
+
+        val authority = "${BuildConfig.APPLICATION_ID}.fileprovider"
+        val uri: Uri = FileProvider.getUriForFile(requireContext(), authority, syncLogFile)
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Expenso Sync Debug Log")
+            putExtra(Intent.EXTRA_TEXT, "Sync log path: ${SyncLogFile.path(requireContext())}")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        startActivity(Intent.createChooser(shareIntent, getString(R.string.text_export_sync_debug_log)))
     }
 
 

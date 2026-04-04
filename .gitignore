@@ -15,3 +15,4 @@
 local.properties
 _*
 supabase/.temp
+debug.log

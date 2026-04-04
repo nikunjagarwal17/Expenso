@@ -79,6 +79,10 @@ function isValidTransactionType(value: unknown): value is "Income" | "Expense" {
   return value === "Income" || value === "Expense";
 }
 
+function logRequest(event: string, details: Record<string, unknown>) {
+  console.log(JSON.stringify({ event, ...details }));
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: buildCorsHeaders(req) });
@@ -118,6 +122,12 @@ serve(async (req: Request) => {
   const user = userData.user;
   const routePath = getRoutePath(req, FUNCTION_SLUG);
   const routeParts = routePath.split("/").filter(Boolean);
+
+  logRequest("expense_api_request", {
+    method: req.method,
+    route: routePath,
+    user_id: user.id
+  });
 
   if (req.method === "GET" && routePath === "/profile") {
     const { data, error } = await userClient
@@ -161,6 +171,7 @@ serve(async (req: Request) => {
     const { data, error } = await userClient
       .from("accounts")
       .select("id,name,opening_balance,current_balance,created_at,updated_at")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -210,6 +221,7 @@ serve(async (req: Request) => {
       .update({ name })
       .eq("id", accountId)
       .eq("user_id", user.id)
+      .is("deleted_at", null)
       .select("id,name,opening_balance,current_balance,created_at,updated_at")
       .single();
 
@@ -227,7 +239,8 @@ serve(async (req: Request) => {
       .from("transactions")
       .select("id", { count: "exact", head: true })
       .eq("account_id", accountId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .is("deleted_at", null);
 
     if (countError) {
       return jsonResponse(req, 400, { error: countError.message });
@@ -239,17 +252,24 @@ serve(async (req: Request) => {
       });
     }
 
-    const { error } = await userClient
+    const { data, error } = await userClient
       .from("accounts")
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", accountId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       return jsonResponse(req, 400, { error: error.message });
     }
 
-    return jsonResponse(req, 200, { message: "Account deleted" });
+    if (!data) {
+      return jsonResponse(req, 200, { message: "Account already deleted" });
+    }
+
+    return jsonResponse(req, 200, { message: "Account deleted (soft)" });
   }
 
   if (req.method === "GET" && routePath === "/transactions") {
@@ -267,6 +287,7 @@ serve(async (req: Request) => {
       .from("transactions")
       .select("id,user_id,account_id,title,amount,transaction_type,tag,occurred_on,note,is_transfer,transfer_group_id,created_at,updated_at", { count: "exact" })
       .eq("user_id", user.id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (accountId) {
@@ -408,6 +429,7 @@ serve(async (req: Request) => {
       .update(updates)
       .eq("id", transactionId)
       .eq("user_id", user.id)
+      .is("deleted_at", null)
       .select("id,user_id,account_id,title,amount,transaction_type,tag,occurred_on,note,is_transfer,transfer_group_id,created_at,updated_at")
       .single();
 
@@ -421,17 +443,24 @@ serve(async (req: Request) => {
   if (req.method === "DELETE" && routeParts[0] === "transactions" && routeParts[1]) {
     const transactionId = routeParts[1];
 
-    const { error } = await userClient
+    const { data, error } = await userClient
       .from("transactions")
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", transactionId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       return jsonResponse(req, 400, { error: error.message });
     }
 
-    return jsonResponse(req, 200, { message: "Transaction deleted" });
+    if (!data) {
+      return jsonResponse(req, 200, { message: "Transaction already deleted" });
+    }
+
+    return jsonResponse(req, 200, { message: "Transaction deleted (soft)" });
   }
 
   if (req.method === "POST" && routePath === "/transfers") {

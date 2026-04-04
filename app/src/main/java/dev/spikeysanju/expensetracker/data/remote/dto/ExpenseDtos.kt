@@ -85,6 +85,8 @@ data class CreateTransactionRequest(
 )
 
 data class UpdateTransactionRequest(
+    @SerializedName("account_id")
+    val accountId: String? = null,
     val title: String,
     val amount: Double,
     @SerializedName("transaction_type")

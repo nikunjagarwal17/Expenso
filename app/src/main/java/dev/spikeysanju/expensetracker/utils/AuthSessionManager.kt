@@ -7,6 +7,8 @@ object AuthSessionManager {
     private const val KEY_ACCESS_TOKEN = "access_token"
     private const val KEY_REFRESH_TOKEN = "refresh_token"
     private const val KEY_EXPIRES_AT_SECONDS = "expires_at_seconds"
+    private const val KEY_LAST_ACTIVE_AT_MS = "last_active_at_ms"
+    private const val SESSION_INACTIVITY_LIMIT_MS = 30L * 24 * 60 * 60 * 1000
 
     data class Session(
         val accessToken: String,
@@ -18,6 +20,10 @@ object AuthSessionManager {
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
     fun isLoggedIn(context: Context): Boolean {
+        if (isSessionExpiredByInactivity(context)) {
+            clearSession(context)
+            return false
+        }
         val accessToken = getAccessToken(context)
         return !accessToken.isNullOrBlank()
     }
@@ -38,7 +44,8 @@ object AuthSessionManager {
             .putString(KEY_ACCESS_TOKEN, accessToken)
             .putString(KEY_REFRESH_TOKEN, refreshToken)
             .putLong(KEY_EXPIRES_AT_SECONDS, expiresAtSeconds)
-            .apply()
+            .putLong(KEY_LAST_ACTIVE_AT_MS, System.currentTimeMillis())
+            .commit()
     }
 
     fun getSession(context: Context): Session? {
@@ -61,13 +68,30 @@ object AuthSessionManager {
             .remove(KEY_ACCESS_TOKEN)
             .remove(KEY_REFRESH_TOKEN)
             .remove(KEY_EXPIRES_AT_SECONDS)
-            .apply()
+            .remove(KEY_LAST_ACTIVE_AT_MS)
+            .commit()
+    }
+
+    fun touchSession(context: Context) {
+        if (getAccessToken(context).isNullOrBlank()) return
+        prefs(context).edit()
+            .putLong(KEY_LAST_ACTIVE_AT_MS, System.currentTimeMillis())
+            .commit()
+    }
+
+    fun isSessionExpiredByInactivity(context: Context): Boolean {
+        val lastActive = prefs(context).getLong(KEY_LAST_ACTIVE_AT_MS, 0L)
+        if (lastActive <= 0L) {
+            return false
+        }
+        return System.currentTimeMillis() - lastActive > SESSION_INACTIVITY_LIMIT_MS
     }
 
     fun isAccessTokenExpired(context: Context): Boolean {
         val expiresAtSeconds = prefs(context).getLong(KEY_EXPIRES_AT_SECONDS, 0L)
         if (expiresAtSeconds <= 0L) {
-            return true
+            // Some responses may omit expires_at; treat access token as usable and let server enforce auth.
+            return false
         }
 
         val nowEpochSeconds = System.currentTimeMillis() / 1000

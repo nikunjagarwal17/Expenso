@@ -19,19 +19,24 @@ import dev.spikeysanju.expensetracker.repo.AccountRepo
 import dev.spikeysanju.expensetracker.repo.TransactionRepo
 import dev.spikeysanju.expensetracker.services.exportcsv.ExportCsvService
 import dev.spikeysanju.expensetracker.utils.AuthSessionManager
+import dev.spikeysanju.expensetracker.utils.SyncDeletionStore
+import dev.spikeysanju.expensetracker.utils.SyncLogFile
 import dev.spikeysanju.expensetracker.utils.viewState.DetailState
 import dev.spikeysanju.expensetracker.utils.viewState.ExportState
 import dev.spikeysanju.expensetracker.utils.viewState.ViewState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 
@@ -51,6 +56,18 @@ class TransactionViewModel @Inject constructor(
     private val remoteSyncService: RemoteSyncService,
     private val remoteMapper: RemoteMapper
 ) : ViewModel() {
+
+    data class SyncConflictSnapshot(
+        val localAccounts: Int,
+        val localTransactions: Int,
+        val remoteAccounts: Int,
+        val remoteTransactions: Int
+    ) {
+        val hasLocalData: Boolean
+            get() = localAccounts > 0 || localTransactions > 0
+        val hasRemoteData: Boolean
+            get() = remoteAccounts > 0 || remoteTransactions > 0
+    }
 
     // Bulk replace all accounts and transactions (for import)
     fun replaceAllData(newAccounts: List<Account>, newTransactions: List<Transaction>) = viewModelScope.launch {
@@ -101,6 +118,7 @@ class TransactionViewModel @Inject constructor(
     val accountFilter: StateFlow<String?> = _accountFilter
 
     private var filterJob: Job? = null
+    private var deleteBurstSyncJob: Job? = null
     private val sortDateFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
 
     private val _uiState = MutableStateFlow<ViewState>(ViewState.Loading)
@@ -152,23 +170,21 @@ class TransactionViewModel @Inject constructor(
             val refreshResult = authRepo.refreshSessionIfNeeded(context)
             if (refreshResult is ApiResult.Error) {
                 Log.e("TransactionVM", "Refresh failed: ${refreshResult.message}")
-                return@launch
-            }
+            } else {
+                val remoteAccountId = resolveRemoteAccountId(transaction.accountId)
+                if (remoteAccountId != null) {
+                    val request = remoteMapper.toCreateTransactionRequest(transaction, remoteAccountId)
+                    when (expenseApiClient.createTransaction(request)) {
+                        is ApiResult.Success -> {
+                            remoteSyncService.syncAllFromRemote()
+                            return@launch
+                        }
 
-            val localAccount = accountRepo.getByIDSync(transaction.accountId)
-            val remoteAccountId = localAccount?.let { resolveRemoteAccountIdByName(it.name) }
-            if (remoteAccountId != null) {
-                val request = remoteMapper.toCreateTransactionRequest(transaction, remoteAccountId)
-                when (expenseApiClient.createTransaction(request)) {
-                    is ApiResult.Success -> {
-                        remoteSyncService.syncAllFromRemote()
-                    }
-
-                    is ApiResult.Error -> {
-                        Log.e("TransactionVM", "Remote create failed")
+                        is ApiResult.Error -> {
+                            Log.e("TransactionVM", "Remote create failed")
+                        }
                     }
                 }
-                return@launch
             }
         }
 
@@ -184,25 +200,29 @@ class TransactionViewModel @Inject constructor(
             val refreshResult = authRepo.refreshSessionIfNeeded(context)
             if (refreshResult is ApiResult.Error) {
                 Log.e("TransactionVM", "Refresh failed: ${refreshResult.message}")
-                return@launch
-            }
+            } else {
+                val remoteId = findRemoteTransactionId(transaction)
+                if (remoteId != null) {
+                    val remoteAccountId = resolveRemoteAccountId(transaction.accountId)
+                    val updateRequest = UpdateTransactionRequest(
+                        accountId = remoteAccountId,
+                        title = transaction.title,
+                        amount = transaction.amount,
+                        transactionType = transaction.transactionType,
+                        tag = transaction.tag,
+                        occurredOn = remoteMapper.toApiDate(transaction.date),
+                        note = transaction.note
+                    )
 
-            val remoteId = findRemoteTransactionId(transaction)
-            if (remoteId != null) {
-                val updateRequest = UpdateTransactionRequest(
-                    title = transaction.title,
-                    amount = transaction.amount,
-                    transactionType = transaction.transactionType,
-                    tag = transaction.tag,
-                    occurredOn = remoteMapper.toApiDate(transaction.date),
-                    note = transaction.note
-                )
+                    when (expenseApiClient.updateTransaction(remoteId, updateRequest)) {
+                        is ApiResult.Success -> {
+                            remoteSyncService.syncAllFromRemote()
+                            return@launch
+                        }
 
-                when (expenseApiClient.updateTransaction(remoteId, updateRequest)) {
-                    is ApiResult.Success -> remoteSyncService.syncAllFromRemote()
-                    is ApiResult.Error -> Log.e("TransactionVM", "Remote update failed")
+                        is ApiResult.Error -> Log.e("TransactionVM", "Remote update failed")
+                    }
                 }
-                return@launch
             }
         }
 
@@ -211,26 +231,31 @@ class TransactionViewModel @Inject constructor(
 
     // delete transaction
     fun deleteTransaction(transaction: Transaction, context: Context? = null) = viewModelScope.launch {
-        if (context != null && AuthSessionManager.isLoggedIn(context)) {
-            val refreshResult = authRepo.refreshSessionIfNeeded(context)
-            if (refreshResult is ApiResult.Error) {
-                Log.e("TransactionVM", "Refresh failed: ${refreshResult.message}")
-                return@launch
-            }
-
-            val remoteId = findRemoteTransactionId(transaction)
-            if (remoteId != null) {
-                when (expenseApiClient.deleteTransaction(remoteId)) {
-                    is ApiResult.Success -> remoteSyncService.syncAllFromRemote()
-                    is ApiResult.Error -> Log.e("TransactionVM", "Remote delete failed")
-                }
-                return@launch
-            }
-        }
-
         transactionRepo.delete(transaction)
         if (transaction.accountId.isNotBlank()) {
             updateAccountBalanceForTransaction(transaction, isAdding = false)
+        }
+
+        if (context != null && AuthSessionManager.isLoggedIn(context)) {
+            SyncDeletionStore.markTransactionDeleted(context, transaction.id)
+            val refreshResult = authRepo.refreshSessionIfNeeded(context)
+            if (refreshResult is ApiResult.Error) {
+                Log.e("TransactionVM", "Refresh failed: ${refreshResult.message}")
+            } else {
+                val remoteId = findRemoteTransactionId(transaction)
+                if (remoteId != null) {
+                    when (expenseApiClient.deleteTransaction(remoteId)) {
+                        is ApiResult.Success -> {
+                            SyncDeletionStore.clearDeletedTransactionId(context, remoteId)
+                            SyncLogFile.append(context, "delete.tx_remote_ok id=${remoteId}")
+                        }
+
+                        is ApiResult.Error -> Log.e("TransactionVM", "Remote delete failed")
+                    }
+                }
+            }
+
+            scheduleDeleteBurstSync(context)
         }
     }
 
@@ -327,11 +352,19 @@ class TransactionViewModel @Inject constructor(
 
     fun insertAccount(account: Account, context: Context? = null) = viewModelScope.launch {
         if (context != null && AuthSessionManager.isLoggedIn(context)) {
-            when (expenseApiClient.createAccount(account.name, account.balance)) {
-                is ApiResult.Success -> remoteSyncService.syncAllFromRemote()
-                is ApiResult.Error -> Log.e("TransactionVM", "Remote account create failed")
+            val refreshResult = authRepo.refreshSessionIfNeeded(context)
+            if (refreshResult is ApiResult.Error) {
+                Log.e("TransactionVM", "Refresh failed: ${refreshResult.message}")
+            } else {
+                when (expenseApiClient.createAccount(account.name, account.balance)) {
+                    is ApiResult.Success -> {
+                        remoteSyncService.syncAllFromRemote()
+                        return@launch
+                    }
+
+                    is ApiResult.Error -> Log.e("TransactionVM", "Remote account create failed")
+                }
             }
-            return@launch
         }
 
         accountRepo.insert(account)
@@ -339,13 +372,21 @@ class TransactionViewModel @Inject constructor(
 
     fun updateAccount(account: Account, context: Context? = null) = viewModelScope.launch {
         if (context != null && AuthSessionManager.isLoggedIn(context)) {
-            val remoteId = resolveRemoteAccountIdByName(account.name)
-            if (remoteId != null) {
-                when (expenseApiClient.updateAccount(remoteId, account.name)) {
-                    is ApiResult.Success -> remoteSyncService.syncAllFromRemote()
-                    is ApiResult.Error -> Log.e("TransactionVM", "Remote account update failed")
+            val refreshResult = authRepo.refreshSessionIfNeeded(context)
+            if (refreshResult is ApiResult.Error) {
+                Log.e("TransactionVM", "Refresh failed: ${refreshResult.message}")
+            } else {
+                val remoteId = resolveRemoteAccountId(account.id)
+                if (remoteId != null) {
+                    when (expenseApiClient.updateAccount(remoteId, account.name)) {
+                        is ApiResult.Success -> {
+                            remoteSyncService.syncAllFromRemote()
+                            return@launch
+                        }
+
+                        is ApiResult.Error -> Log.e("TransactionVM", "Remote account update failed")
+                    }
                 }
-                return@launch
             }
         }
 
@@ -353,18 +394,37 @@ class TransactionViewModel @Inject constructor(
     }
 
     fun deleteAccount(account: Account, context: Context? = null) = viewModelScope.launch {
-        if (context != null && AuthSessionManager.isLoggedIn(context)) {
-            val remoteId = resolveRemoteAccountIdByName(account.name)
-            if (remoteId != null) {
-                when (expenseApiClient.deleteAccount(remoteId)) {
-                    is ApiResult.Success -> remoteSyncService.syncAllFromRemote()
-                    is ApiResult.Error -> Log.e("TransactionVM", "Remote account delete failed")
-                }
-                return@launch
-            }
-        }
-
         accountRepo.delete(account)
+
+        if (context != null && AuthSessionManager.isLoggedIn(context)) {
+            SyncDeletionStore.markAccountDeleted(context, account.id)
+            val refreshResult = authRepo.refreshSessionIfNeeded(context)
+            if (refreshResult is ApiResult.Error) {
+                Log.e("TransactionVM", "Refresh failed: ${refreshResult.message}")
+            } else {
+                val remoteId = resolveRemoteAccountId(account.id)
+                if (remoteId != null) {
+                    when (expenseApiClient.deleteAccount(remoteId)) {
+                        is ApiResult.Success -> {
+                            SyncDeletionStore.clearDeletedAccountId(context, remoteId)
+                            SyncLogFile.append(context, "delete.account_remote_ok id=${remoteId}")
+                        }
+
+                        is ApiResult.Error -> Log.e("TransactionVM", "Remote account delete failed")
+                    }
+                }
+            }
+
+            scheduleDeleteBurstSync(context)
+        }
+    }
+
+    private fun scheduleDeleteBurstSync(context: Context) {
+        deleteBurstSyncJob?.cancel()
+        deleteBurstSyncJob = viewModelScope.launch(IO) {
+            delay(1200)
+            syncFromRemoteIfLoggedIn(context)
+        }
     }
 
     fun performTransfer(
@@ -378,25 +438,33 @@ class TransactionViewModel @Inject constructor(
         val toAccount = accountRepo.getByIDSync(toAccountId) ?: return@launch
 
         if (context != null && AuthSessionManager.isLoggedIn(context)) {
-            val fromRemoteId = resolveRemoteAccountIdByName(fromAccount.name)
-            val toRemoteId = resolveRemoteAccountIdByName(toAccount.name)
-            if (fromRemoteId != null && toRemoteId != null) {
-                val request = remoteMapper.toCreateTransferRequest(
-                    fromRemoteAccountId = fromRemoteId,
-                    toRemoteAccountId = toRemoteId,
-                    amount = amount,
-                    taxAmount = taxAmount,
-                    title = "Transfer ${fromAccount.name} -> ${toAccount.name}",
-                    note = "Transfer",
-                    date = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
-                        .format(java.util.Date())
-                )
+            val refreshResult = authRepo.refreshSessionIfNeeded(context)
+            if (refreshResult is ApiResult.Error) {
+                Log.e("TransactionVM", "Refresh failed: ${refreshResult.message}")
+            } else {
+                val fromRemoteId = resolveRemoteAccountId(fromAccountId)
+                val toRemoteId = resolveRemoteAccountId(toAccountId)
+                if (fromRemoteId != null && toRemoteId != null) {
+                    val request = remoteMapper.toCreateTransferRequest(
+                        fromRemoteAccountId = fromRemoteId,
+                        toRemoteAccountId = toRemoteId,
+                        amount = amount,
+                        taxAmount = taxAmount,
+                        title = "Transfer ${fromAccount.name} -> ${toAccount.name}",
+                        note = "Transfer",
+                        date = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                            .format(java.util.Date())
+                    )
 
-                when (expenseApiClient.createTransfer(request)) {
-                    is ApiResult.Success -> remoteSyncService.syncAllFromRemote()
-                    is ApiResult.Error -> Log.e("TransactionVM", "Remote transfer failed")
+                    when (expenseApiClient.createTransfer(request)) {
+                        is ApiResult.Success -> {
+                            remoteSyncService.syncAllFromRemote()
+                            return@launch
+                        }
+
+                        is ApiResult.Error -> Log.e("TransactionVM", "Remote transfer failed")
+                    }
                 }
-                return@launch
             }
         }
 
@@ -454,30 +522,106 @@ class TransactionViewModel @Inject constructor(
     }
 
     fun syncFromRemoteIfLoggedIn(context: Context) = viewModelScope.launch(IO) {
+        SyncLogFile.append(context, "sync.start")
         if (!AuthSessionManager.isLoggedIn(context)) {
+            SyncLogFile.append(context, "sync.skip_not_logged_in")
             return@launch
         }
 
         val refresh = authRepo.refreshSessionIfNeeded(context)
         if (refresh is ApiResult.Error) {
             Log.e("TransactionVM", "Session refresh failed: ${refresh.message}")
+            SyncLogFile.append(context, "sync.refresh_failed: ${refresh.message}")
             return@launch
         }
+        SyncLogFile.append(context, "sync.refresh_ok")
 
-        when (val sync = remoteSyncService.syncAllFromRemote()) {
+        when (val sync = remoteSyncService.syncAllFromRemote(pushLocalChanges = true)) {
             is ApiResult.Success -> {
                 loadAccounts()
                 applyFilters()
+                SyncLogFile.append(context, "sync.success")
             }
 
-            is ApiResult.Error -> Log.e("TransactionVM", "Remote sync failed: ${sync.message}")
+            is ApiResult.Error -> {
+                Log.e("TransactionVM", "Remote sync failed: ${sync.message}")
+                SyncLogFile.append(context, "sync.failed: ${sync.message}")
+            }
         }
     }
 
-    private suspend fun resolveRemoteAccountIdByName(localName: String): String? {
+    suspend fun getSyncConflictSnapshot(context: Context): ApiResult<SyncConflictSnapshot> {
+        return withContext(IO) {
+            if (!AuthSessionManager.isLoggedIn(context)) {
+                return@withContext ApiResult.Error("Not logged in")
+            }
+
+            val refresh = authRepo.refreshSessionIfNeeded(context)
+            if (refresh is ApiResult.Error) {
+                return@withContext refresh
+            }
+
+            val localAccounts = accountRepo.getAllAccounts().first().size
+            val localTransactions = transactionRepo.getAllTransactions().first().size
+
+            val remoteAccountsResult = expenseApiClient.getAccounts()
+            if (remoteAccountsResult is ApiResult.Error) {
+                return@withContext remoteAccountsResult
+            }
+
+            val remoteTransactionsResult = expenseApiClient.getTransactions()
+            if (remoteTransactionsResult is ApiResult.Error) {
+                return@withContext remoteTransactionsResult
+            }
+
+            ApiResult.Success(
+                SyncConflictSnapshot(
+                    localAccounts = localAccounts,
+                    localTransactions = localTransactions,
+                    remoteAccounts = (remoteAccountsResult as ApiResult.Success).data.size,
+                    remoteTransactions = (remoteTransactionsResult as ApiResult.Success).data.size
+                )
+            )
+        }
+    }
+
+    suspend fun resolveInitialSyncChoice(context: Context, keepLocalData: Boolean): ApiResult<Unit> {
+        return withContext(IO) {
+            if (!AuthSessionManager.isLoggedIn(context)) {
+                return@withContext ApiResult.Error("Not logged in")
+            }
+
+            val refresh = authRepo.refreshSessionIfNeeded(context)
+            if (refresh is ApiResult.Error) {
+                return@withContext refresh
+            }
+
+            val result = if (keepLocalData) {
+                SyncLogFile.append(context, "sync.choice.keep_local")
+                remoteSyncService.replaceRemoteWithLocal()
+            } else {
+                SyncLogFile.append(context, "sync.choice.keep_server")
+                remoteSyncService.syncAllFromRemote(pushLocalChanges = false)
+            }
+
+            if (result is ApiResult.Success) {
+                loadAccounts()
+                applyFilters()
+            }
+            result
+        }
+    }
+
+    private suspend fun resolveRemoteAccountId(localAccountId: String): String? {
         return when (val result = expenseApiClient.getAccounts()) {
             is ApiResult.Success -> {
-                result.data.firstOrNull { it.name.equals(localName, ignoreCase = true) }?.id
+                result.data.firstOrNull { it.id == localAccountId }?.id
+                    ?: run {
+                        val localAccount = accountRepo.getByIDSync(localAccountId)
+                        result.data.firstOrNull {
+                            localAccount != null && it.name.equals(localAccount.name, ignoreCase = true)
+                        }?.id
+                    }
             }
 
             is ApiResult.Error -> null
@@ -489,14 +633,13 @@ class TransactionViewModel @Inject constructor(
             is ApiResult.Success -> {
                 result.data.firstOrNull { it.id == local.id }?.id
                     ?: run {
-                val localAccount = accountRepo.getByIDSync(local.accountId)
-                val remoteAccountId = localAccount?.let { resolveRemoteAccountIdByName(it.name) }
-                result.data.firstOrNull {
-                    it.accountId == remoteAccountId &&
-                        it.title == local.title &&
-                        it.amount == local.amount &&
-                        it.transactionType == local.transactionType
-                }?.id
+                        val remoteAccountId = resolveRemoteAccountId(local.accountId)
+                        result.data.firstOrNull {
+                            it.accountId == remoteAccountId &&
+                                it.title == local.title &&
+                                it.amount == local.amount &&
+                                it.transactionType == local.transactionType
+                        }?.id
                     }
             }
 

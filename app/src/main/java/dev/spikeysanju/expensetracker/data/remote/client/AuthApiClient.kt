@@ -10,6 +10,7 @@ import dev.spikeysanju.expensetracker.data.remote.dto.RefreshRequest
 import dev.spikeysanju.expensetracker.data.remote.dto.ResendVerificationRequest
 import dev.spikeysanju.expensetracker.data.remote.dto.SignupRequest
 import javax.inject.Inject
+import retrofit2.Response
 
 class AuthApiClient @Inject constructor(
     private val authApiService: AuthApiService,
@@ -31,7 +32,7 @@ class AuthApiClient @Inject constructor(
                         ?: "Signup created. Verify your email before logging in."
                 )
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -47,7 +48,7 @@ class AuthApiClient @Inject constructor(
                     ApiResult.Error("Invalid server response")
                 }
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -63,7 +64,7 @@ class AuthApiClient @Inject constructor(
                     ApiResult.Error("Invalid server response")
                 }
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -76,7 +77,7 @@ class AuthApiClient @Inject constructor(
                     response.body()?.message ?: "Verification email sent"
                 )
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
     }
@@ -89,9 +90,29 @@ class AuthApiClient @Inject constructor(
                     response.body()?.message ?: "Password reset email sent"
                 )
             } else {
-                ApiResult.Error(parseError(response.errorBody()?.string()), response.code())
+                buildError(response)
             }
         }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
+    }
+
+    private fun buildError(response: Response<*>): ApiResult.Error {
+        val rawBody = runCatching { response.errorBody()?.string() }.getOrNull()
+        val parsed = parseError(rawBody)
+        val details = buildString {
+            append("HTTP ")
+            append(response.code())
+            if (response.message().isNotBlank()) {
+                append(" ")
+                append(response.message())
+            }
+            append(" | ")
+            append(parsed)
+            if (!rawBody.isNullOrBlank()) {
+                append(" | body=")
+                append(rawBody.take(500))
+            }
+        }
+        return ApiResult.Error(details, response.code())
     }
 
     private fun parseError(rawBody: String?): String {

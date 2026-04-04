@@ -20,6 +20,10 @@ val supabaseUrl =
 val supabasePublishableKey =
     (localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY")
         ?: "sb_publishable_LbUyfLmRwzUjIiqs3e3-iQ_aixl718B").trim()
+val enableSyncDebugButton =
+    (localProperties.getProperty("ENABLE_SYNC_DEBUG_BUTTON") ?: "true")
+        .trim()
+        .equals("true", ignoreCase = true)
 
 android {
     compileSdk = 34
@@ -47,6 +51,7 @@ android {
             "SUPABASE_PUBLISHABLE_KEY",
             "\"$supabasePublishableKey\""
         )
+        buildConfigField("boolean", "ENABLE_SYNC_DEBUG_BUTTON", enableSyncDebugButton.toString())
     }
 
     lint {

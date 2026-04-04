@@ -71,4 +71,23 @@
             android:text="Import/Export Data"/>
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/syncDebugLogLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvSyncDebugLog"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Export Sync Debug Log"/>
+    </LinearLayout>
+
 </LinearLayout>
