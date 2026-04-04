@@ -25,7 +25,9 @@ class AuthRepo @Inject constructor(
                     context = context,
                     accessToken = result.data.accessToken,
                     refreshToken = result.data.refreshToken,
-                    expiresAtSeconds = result.data.expiresAt
+                    expiresAtSeconds = result.data.expiresAt,
+                    userEmail = result.data.user?.email,
+                    userFullName = result.data.user?.fullName
                 )
                 SyncLogFile.append(
                     context,
@@ -52,7 +54,9 @@ class AuthRepo @Inject constructor(
                     context = context,
                     accessToken = result.data.accessToken,
                     refreshToken = result.data.refreshToken,
-                    expiresAtSeconds = result.data.expiresAt
+                    expiresAtSeconds = result.data.expiresAt,
+                    userEmail = result.data.user?.email,
+                    userFullName = result.data.user?.fullName
                 )
                 SyncLogFile.append(
                     context,

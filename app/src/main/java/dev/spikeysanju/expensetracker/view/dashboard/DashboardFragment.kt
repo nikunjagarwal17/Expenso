@@ -84,6 +84,10 @@ class DashboardFragment :
         observeAccounts()
         swipeToDelete()
         viewModel.syncFromRemoteIfLoggedIn(requireContext())
+        lifecycleScope.launchWhenStarted {
+            viewModel.refreshProfileCache(requireContext())
+            requireActivity().invalidateOptionsMenu()
+        }
     }
 
     override fun onResume() {
@@ -414,6 +418,14 @@ class DashboardFragment :
             getString(R.string.text_logout)
         } else {
             getString(R.string.text_login_signup)
+        }
+
+        val profileItem = menu.findItem(R.id.action_profile_name)
+        val displayName = AuthSessionManager.getDisplayName(requireContext())
+        profileItem.title = if (AuthSessionManager.isLoggedIn(requireContext())) {
+            getString(R.string.text_profile_menu_label, displayName ?: getString(R.string.text_profile_guest))
+        } else {
+            getString(R.string.text_profile_menu_label, getString(R.string.text_profile_guest))
         }
     }
 

@@ -57,17 +57,28 @@
     <string name="text_signup">Sign up</string>
     <string name="text_continue_without_login">Continue without login</string>
     <string name="text_email">Email</string>
+    <string name="text_full_name">Full Name</string>
     <string name="text_password">Password</string>
     <string name="text_login_subtitle">Enter your email and password to continue.</string>
     <string name="text_signup_subtitle">Create your account with email and password.</string>
     <string name="text_dont_have_account">Don\'t have an account? Sign up</string>
     <string name="text_already_have_account">Already have an account? Login</string>
+    <string name="text_forgot_password">Forgot password?</string>
+    <string name="text_resend_verification">Resend verification email</string>
     <string name="text_back">Back</string>
     <string name="text_email_required">Email is required</string>
+    <string name="text_full_name_required">Full name is required</string>
+    <string name="text_email_required_for_recovery">Enter email to receive reset instructions</string>
+    <string name="text_email_required_for_resend">Enter email to resend verification</string>
     <string name="text_password_required">Password is required</string>
     <string name="text_login_success">Login successful</string>
     <string name="text_logout">Logout</string>
     <string name="text_logged_out">Logged out successfully</string>
+    <string name="text_profile_guest">Guest</string>
+    <string name="text_profile_name_placeholder">Profile name</string>
+    <string name="text_profile_email_placeholder">Email not available</string>
+    <string name="text_profile_menu_label">Profile: %1$s</string>
+    <string name="text_enter_email">Enter email</string>
 
     <!-- share transaction -->
     <string name="share_message">\%s \nAmount: %s, \nTransaction-Type: %s, \nAccount: %s, \nDate: %s, \nNote: %s, \nCreatedAt: %s</string>

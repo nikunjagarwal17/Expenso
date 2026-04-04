@@ -8,6 +8,8 @@ object AuthSessionManager {
     private const val KEY_REFRESH_TOKEN = "refresh_token"
     private const val KEY_EXPIRES_AT_SECONDS = "expires_at_seconds"
     private const val KEY_LAST_ACTIVE_AT_MS = "last_active_at_ms"
+    private const val KEY_USER_EMAIL = "user_email"
+    private const val KEY_USER_FULL_NAME = "user_full_name"
     private const val SESSION_INACTIVITY_LIMIT_MS = 30L * 24 * 60 * 60 * 1000
 
     data class Session(
@@ -38,7 +40,9 @@ object AuthSessionManager {
         context: Context,
         accessToken: String,
         refreshToken: String,
-        expiresAtSeconds: Long
+        expiresAtSeconds: Long,
+        userEmail: String? = null,
+        userFullName: String? = null
     ) {
         val cleanAccessToken = sanitizeToken(accessToken)
         val cleanRefreshToken = sanitizeToken(refreshToken)
@@ -47,6 +51,8 @@ object AuthSessionManager {
             .putString(KEY_REFRESH_TOKEN, cleanRefreshToken)
             .putLong(KEY_EXPIRES_AT_SECONDS, expiresAtSeconds)
             .putLong(KEY_LAST_ACTIVE_AT_MS, System.currentTimeMillis())
+            .putString(KEY_USER_EMAIL, userEmail?.trim().orEmpty())
+            .putString(KEY_USER_FULL_NAME, userFullName?.trim().orEmpty())
             .commit()
     }
 
@@ -71,7 +77,34 @@ object AuthSessionManager {
             .remove(KEY_REFRESH_TOKEN)
             .remove(KEY_EXPIRES_AT_SECONDS)
             .remove(KEY_LAST_ACTIVE_AT_MS)
+            .remove(KEY_USER_EMAIL)
+            .remove(KEY_USER_FULL_NAME)
             .commit()
+    }
+
+    fun getUserEmail(context: Context): String? {
+        val value = prefs(context).getString(KEY_USER_EMAIL, null)?.trim().orEmpty()
+        return value.ifBlank { null }
+    }
+
+    fun getUserFullName(context: Context): String? {
+        val value = prefs(context).getString(KEY_USER_FULL_NAME, null)?.trim().orEmpty()
+        return value.ifBlank { null }
+    }
+
+    fun getDisplayName(context: Context): String? {
+        return getUserFullName(context) ?: getUserEmail(context)
+    }
+
+    fun updateProfileCache(context: Context, email: String?, fullName: String?) {
+        val editor = prefs(context).edit()
+        if (!email.isNullOrBlank()) {
+            editor.putString(KEY_USER_EMAIL, email.trim())
+        }
+        if (!fullName.isNullOrBlank()) {
+            editor.putString(KEY_USER_FULL_NAME, fullName.trim())
+        }
+        editor.apply()
     }
 
     fun touchSession(context: Context) {

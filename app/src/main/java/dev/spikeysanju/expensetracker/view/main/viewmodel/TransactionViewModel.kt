@@ -452,6 +452,45 @@ class TransactionViewModel @Inject constructor(
         }
     }
 
+    suspend fun refreshProfileCache(context: Context): ApiResult<String?> {
+        return withContext(IO) {
+            if (!AuthSessionManager.isLoggedIn(context)) {
+                return@withContext ApiResult.Success(null)
+            }
+
+            val refresh = authRepo.refreshSessionIfNeeded(context)
+            if (refresh is ApiResult.Error) {
+                return@withContext refresh
+            }
+
+            return@withContext when (val profileResult = expenseApiClient.getProfile()) {
+                is ApiResult.Success -> {
+                    val profile = profileResult.data
+                    AuthSessionManager.updateProfileCache(
+                        context = context,
+                        email = profile?.email,
+                        fullName = profile?.fullName
+                    )
+                    ApiResult.Success(AuthSessionManager.getDisplayName(context))
+                }
+
+                is ApiResult.Error -> profileResult
+            }
+        }
+    }
+
+    suspend fun resendVerification(email: String): ApiResult<String> {
+        return withContext(IO) {
+            authRepo.resendVerification(email)
+        }
+    }
+
+    suspend fun forgotPassword(email: String): ApiResult<String> {
+        return withContext(IO) {
+            authRepo.forgotPassword(email)
+        }
+    }
+
     suspend fun resolveInitialSyncChoice(context: Context, keepLocalData: Boolean): ApiResult<Unit> {
         return withContext(IO) {
             if (!AuthSessionManager.isLoggedIn(context)) {

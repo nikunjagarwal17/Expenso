@@ -29,6 +29,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/action_profile_name"
+        android:enabled="false"
+        android:title="@string/text_profile_guest"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_login_signup"
         android:enabled="true"
         android:title="@string/text_login_signup"

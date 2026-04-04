@@ -91,6 +91,7 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         updateAuthActionLabel()
+        refreshProfileInfo()
 
         binding.authActionLayout.setOnClickListener {
             if (AuthSessionManager.isLoggedIn(requireContext())) {
@@ -107,6 +108,39 @@ class SettingsFragment : Fragment() {
                 )
             } else {
                 findNavController().navigate(R.id.authWelcomeFragment)
+            }
+            updateAuthActionLabel()
+        }
+
+        binding.forgotPasswordLayout.setOnClickListener {
+            requestRecoveryEmail { email ->
+                lifecycleScope.launch {
+                    when (val result = viewModel.forgotPassword(email)) {
+                        is dev.spikeysanju.expensetracker.data.remote.client.ApiResult.Success -> {
+                            Snackbar.make(binding.root, result.data, Snackbar.LENGTH_LONG).show()
+                        }
+
+                        is dev.spikeysanju.expensetracker.data.remote.client.ApiResult.Error -> {
+                            Snackbar.make(binding.root, result.message, Snackbar.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+        }
+
+        binding.resendVerificationLayout.setOnClickListener {
+            requestRecoveryEmail { email ->
+                lifecycleScope.launch {
+                    when (val result = viewModel.resendVerification(email)) {
+                        is dev.spikeysanju.expensetracker.data.remote.client.ApiResult.Success -> {
+                            Snackbar.make(binding.root, result.data, Snackbar.LENGTH_LONG).show()
+                        }
+
+                        is dev.spikeysanju.expensetracker.data.remote.client.ApiResult.Error -> {
+                            Snackbar.make(binding.root, result.message, Snackbar.LENGTH_LONG).show()
+                        }
+                    }
+                }
             }
         }
 
@@ -135,15 +169,81 @@ class SettingsFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         updateAuthActionLabel()
+        refreshProfileInfo()
     }
 
     private fun updateAuthActionLabel() {
-        val actionText = if (AuthSessionManager.isLoggedIn(requireContext())) {
+        val isLoggedIn = AuthSessionManager.isLoggedIn(requireContext())
+        val actionText = if (isLoggedIn) {
             getString(R.string.text_logout)
         } else {
             getString(R.string.text_login_signup)
         }
         binding.tvAuthAction.text = actionText
+        binding.forgotPasswordLayout.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
+        binding.resendVerificationLayout.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
+
+        if (!isLoggedIn) {
+            binding.tvProfileName.text = getString(R.string.text_profile_guest)
+            binding.tvProfileEmail.text = getString(R.string.text_profile_email_placeholder)
+        }
+    }
+
+    private fun refreshProfileInfo() {
+        val context = requireContext()
+        val cachedDisplayName = AuthSessionManager.getDisplayName(context)
+        val cachedEmail = AuthSessionManager.getUserEmail(context)
+
+        binding.tvProfileName.text = cachedDisplayName ?: getString(R.string.text_profile_guest)
+        binding.tvProfileEmail.text = cachedEmail ?: getString(R.string.text_profile_email_placeholder)
+
+        if (!AuthSessionManager.isLoggedIn(context)) {
+            return
+        }
+
+        lifecycleScope.launch {
+            when (val result = viewModel.refreshProfileCache(context)) {
+                is dev.spikeysanju.expensetracker.data.remote.client.ApiResult.Success -> {
+                    val latestName = AuthSessionManager.getDisplayName(context)
+                    val latestEmail = AuthSessionManager.getUserEmail(context)
+                    binding.tvProfileName.text = latestName ?: getString(R.string.text_profile_guest)
+                    binding.tvProfileEmail.text = latestEmail ?: getString(R.string.text_profile_email_placeholder)
+                }
+
+                is dev.spikeysanju.expensetracker.data.remote.client.ApiResult.Error -> {
+                    // Keep cached values when network/profile refresh fails.
+                }
+            }
+        }
+    }
+
+    private fun requestRecoveryEmail(onEmailReady: (String) -> Unit) {
+        val context = requireContext()
+        val cachedEmail = AuthSessionManager.getUserEmail(context)
+        if (!cachedEmail.isNullOrBlank()) {
+            onEmailReady(cachedEmail)
+            return
+        }
+
+        val input = android.widget.EditText(context).apply {
+            hint = getString(R.string.text_email)
+            setSingleLine()
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.text_enter_email)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val email = input.text?.toString()?.trim().orEmpty()
+                if (email.isNotEmpty()) {
+                    onEmailReady(email)
+                } else {
+                    Snackbar.make(binding.root, getString(R.string.text_email_required), Snackbar.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun showCurrencyDialog() {
@@ -308,7 +408,13 @@ class SettingsFragment : Fragment() {
         accounts.forEach { sb.append("${it.id},${it.name},${it.balance}\n") }
         sb.append("# Transactions\n")
         sb.append("id,title,amount,transactionType,tag,date,note,createdAt,accountId,isTransfer\n")
-        transactions.forEach {
+        val dateFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+        val oldestFirstTransactions = transactions.sortedWith(
+            compareBy<dev.spikeysanju.expensetracker.model.Transaction> {
+                runCatching { dateFormat.parse(it.date)?.time ?: 0L }.getOrDefault(0L)
+            }.thenBy { it.createdAt }
+        )
+        oldestFirstTransactions.forEach {
             sb.append("${it.id},${it.title},${it.amount},${it.transactionType},${it.tag},${it.date},${it.note},${it.createdAt},${it.accountId},${it.isTransfer}\n")
         }
         return sb.toString()

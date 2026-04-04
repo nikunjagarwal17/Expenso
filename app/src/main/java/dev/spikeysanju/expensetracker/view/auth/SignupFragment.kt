@@ -37,20 +37,22 @@ class SignupFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         binding.btnSignup.setOnClickListener {
+            val fullName = binding.etFullName.text?.toString()?.trim().orEmpty()
             val email = binding.etEmail.text?.toString()?.trim().orEmpty()
             val password = binding.etPassword.text?.toString().orEmpty()
-            val fullName = binding.etEmail.text?.toString()?.substringBefore("@")?.trim()
 
+            binding.tilFullName.error = null
             binding.tilEmail.error = null
             binding.tilPassword.error = null
 
             when {
+                fullName.isEmpty() -> binding.tilFullName.error = getString(R.string.text_full_name_required)
                 email.isEmpty() -> binding.tilEmail.error = getString(R.string.text_email_required)
                 password.isEmpty() -> binding.tilPassword.error = getString(R.string.text_password_required)
                 else -> {
                     binding.btnSignup.isEnabled = false
                     lifecycleScope.launch {
-                        when (val result = authRepo.signup(email, password, fullName)) {
+                        when (val result = authRepo.signup(email, password, fullName.ifBlank { null })) {
                             is ApiResult.Success -> {
                                 Toast.makeText(
                                     requireContext(),

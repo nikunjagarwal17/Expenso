@@ -7,8 +7,10 @@ import dev.spikeysanju.expensetracker.data.remote.dto.CreateTransactionRequest
 import dev.spikeysanju.expensetracker.data.remote.dto.CreateTransferRequest
 import dev.spikeysanju.expensetracker.data.remote.dto.ErrorResponse
 import dev.spikeysanju.expensetracker.data.remote.dto.RemoteAccount
+import dev.spikeysanju.expensetracker.data.remote.dto.RemoteProfile
 import dev.spikeysanju.expensetracker.data.remote.dto.RemoteTransaction
 import dev.spikeysanju.expensetracker.data.remote.dto.UpdateAccountRequest
+import dev.spikeysanju.expensetracker.data.remote.dto.UpdateProfileRequest
 import dev.spikeysanju.expensetracker.data.remote.dto.UpdateTransactionRequest
 import javax.inject.Inject
 import retrofit2.Response
@@ -17,6 +19,28 @@ class ExpenseApiClient @Inject constructor(
     private val expenseApiService: ExpenseApiService,
     private val gson: Gson
 ) {
+    suspend fun getProfile(): ApiResult<RemoteProfile?> {
+        return runCatching {
+            val response = expenseApiService.getProfile()
+            if (response.isSuccessful) {
+                ApiResult.Success(response.body()?.data)
+            } else {
+                buildError(response)
+            }
+        }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
+    }
+
+    suspend fun updateProfile(fullName: String?): ApiResult<RemoteProfile?> {
+        return runCatching {
+            val response = expenseApiService.updateProfile(UpdateProfileRequest(fullName = fullName))
+            if (response.isSuccessful) {
+                ApiResult.Success(response.body()?.data)
+            } else {
+                buildError(response)
+            }
+        }.getOrElse { ApiResult.Error(it.message ?: "Network error") }
+    }
+
     suspend fun getAccounts(): ApiResult<List<RemoteAccount>> {
         return runCatching {
             val response = expenseApiService.getAccounts()

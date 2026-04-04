@@ -81,6 +81,46 @@ class LoginFragment : Fragment() {
         binding.tvSignup.setOnClickListener {
             findNavController().navigate(R.id.action_loginFragment_to_signupFragment)
         }
+
+        binding.tvForgotPassword.setOnClickListener {
+            val email = binding.etEmail.text?.toString()?.trim().orEmpty()
+            if (email.isEmpty()) {
+                binding.tilEmail.error = getString(R.string.text_email_required_for_recovery)
+                return@setOnClickListener
+            }
+            binding.tilEmail.error = null
+            lifecycleScope.launch {
+                when (val result = transactionViewModel.forgotPassword(email)) {
+                    is ApiResult.Success -> {
+                        Toast.makeText(requireContext(), result.data, Toast.LENGTH_LONG).show()
+                    }
+
+                    is ApiResult.Error -> {
+                        Toast.makeText(requireContext(), result.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+
+        binding.tvResendVerification.setOnClickListener {
+            val email = binding.etEmail.text?.toString()?.trim().orEmpty()
+            if (email.isEmpty()) {
+                binding.tilEmail.error = getString(R.string.text_email_required_for_resend)
+                return@setOnClickListener
+            }
+            binding.tilEmail.error = null
+            lifecycleScope.launch {
+                when (val result = transactionViewModel.resendVerification(email)) {
+                    is ApiResult.Success -> {
+                        Toast.makeText(requireContext(), result.data, Toast.LENGTH_LONG).show()
+                    }
+
+                    is ApiResult.Error -> {
+                        Toast.makeText(requireContext(), result.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
     }
 
     override fun onDestroyView() {
